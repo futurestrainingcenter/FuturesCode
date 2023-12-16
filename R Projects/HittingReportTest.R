@@ -19,9 +19,11 @@ library(gt)
 font_add(family = "Good Times", regular = "good times rg.otf")
 showtext_auto()
 
-blastData <- read_csv("/Volumes/COLE'S DATA/Data/Blast Master Data - Sheet1.csv")
+blastData <- read_csv("/Users/watts/Documents/Futures Performance Center/Data/Full Team Report - 2023-08-28 - 2023-08-28 - 1696385310/master_data.csv") %>% 
+  rename(Name = Athlete)
 hittraxData <- read_csv("/Volumes/COLE'S DATA/Data/Hittrax Master Data - Sheet1.csv")
-clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv")
+clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv") %>% 
+  rename(Name = Client)
 attendanceData <- read_csv("/Users/watts/Downloads/HittingAttendance_data.csv")
 
 # Function to calculate age
@@ -38,6 +40,11 @@ calculate_age <- function(birthdate) {
 # Create a new column "Age" that calculates their age
 clientData$Age <- sapply(clientData$`field-general-7.dl_date`, calculate_age)
 colnames(clientData)[colnames(clientData) == "Client"] <- "Name"
+
+
+blastData$Date <- as.Date(blastData$Date, format = "%b %d, %Y")
+blastData$Month <- format(blastData$Date, "%B")
+blastData <- left_join(blastData, clientData, by = "Name")
 
 blastData <- blastData %>%
   arrange(Name, match(Month, month.name)) %>%
@@ -56,20 +63,9 @@ blastData <- blastData %>%
     Power_YTD_Change = round(cumsum(coalesce(`Power (kW)` - lag(`Power (kW)`, order_by = match(Month, month.name)), 0)), 1)
   )
 
-# Data manipulation for hittraxData
+hittraxData <- left_join(hittraxData, clientData, by = "Name")
+
 hittraxData <- hittraxData %>%
-  mutate(
-    Level = case_when(
-      Sport == "Baseball" & Age %in% c("8", "9", "10", "11") ~ "Baseball_L1",
-      Sport == "Baseball" & Age %in% c("12", "13", "14") ~ "Baseball_L2",
-      Sport == "Baseball" & Age %in% c("15", "16", "17", "18") ~ "Baseball_L3",
-      Sport == "Baseball" & TRUE ~ "Collegiate",
-      Sport == "Softball" & Age %in% c("8", "9", "10", "11") ~ "Softball_L1",
-      Sport == "Softball" & Age %in% c("12", "13", "14") ~ "Softball_L2",
-      Sport == "Softball" & Age %in% c("15", "16", "17", "18") ~ "Softball_L3",
-      Sport == "Softball" & TRUE ~ "Collegiate"
-    )
-  ) %>%
   arrange(Name, match(Month, month.name)) %>%
   group_by(Name) %>%
   mutate(
@@ -90,7 +86,7 @@ hittraxData <- hittraxData %>%
     AvgDist_YTD_Change = round(cumsum(coalesce(AvgDist - lag(AvgDist, order_by = match(Month, month.name)), 0)), 1)
   ) %>%
   ungroup() %>%
-  group_by(Sport, Level, Month) %>%
+  group_by(`Reporting Level (Age-Dependent)`, Gender, Month) %>%
   mutate(
     MaxVel_Rank = rank(-MaxVel_CumMax, ties.method = "min"),
     AvgVel_Rank = rank(-AvgVel, ties.method = "min"),
@@ -110,11 +106,12 @@ setwd("/Users/watts/Documents/Futures Performance Center/Test")
 
 for (athlete in athletes){
   
-  combined_data <- left_join(hittraxData, blastData, by = c("Name", "Month")) %>% 
-    filter(Month == "November" & Name == "Aaron Springston")
+  filteredHittrax <- hittraxData %>% 
+    filter(Month == "November" & Name == athlete)
   
   # Fetch the group of the current player
-  current_level <- unique(combined_data$Level)[1]
+  current_level <- unique(filteredHittrax$`Reporting Level (Age-Dependent)`)[1]
+  current_gender <- unique(filteredHittrax$Gender)[1]
   
   # Check if current_level is empty or NA, if yes skip to next iteration
   if (is.na(current_level) || length(current_level) == 0) {
@@ -182,7 +179,7 @@ for (athlete in athletes){
   playerSummary1 <- image_read(paste0("Futures Reports Images/",athlete," - playerProfile.png"))
   PitchingReport1 <- image_composite(TemplatePageOne, playerSummary1, offset= "+50+525")
   
-  maxVel <- combined_data %>% 
+  maxVel <- filteredHittrax %>% 
     ggplot(aes(x = `MaxVel Rank`, y = "")) +
     geom_segment(aes(x = 0, xend = 100, y = "", yend = ""), color = "#9b9b9b", linewidth = 1) +
     geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
@@ -190,10 +187,10 @@ for (athlete in athletes){
     geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
     geom_point(aes(fill = `MaxVel Rank`), color = "black", pch = 21, size = 12) +
     geom_text(aes(label = round(`MaxVel Rank`)), size = 10, fontface = "bold") +
-    labs(title = paste(round(combined_data$MaxVel_CumMax, digits = 1), "MPH"),
-         subtitle = paste("MOM Change:", combined_data$MaxVel_Monthly_Change, 
-                          "| YTD Change:", combined_data$MaxVel_YTD_Change,
-                          "\nLevel Rank:", combined_data$MaxVel_Rank, "/", combined_data$Total_Players)) +
+    labs(title = paste(round(filteredHittrax$MaxVel_CumMax, digits = 1), "MPH"),
+         subtitle = paste("MOM Change:", filteredHittrax$MaxVel_Monthly_Change, 
+                          "| YTD Change:", filteredHittrax$MaxVel_YTD_Change,
+                          "\nLevel Rank:", filteredHittrax$MaxVel_Rank, "/", filteredHittrax$Total_Players)) +
     scale_fill_gradient2(low = "#FF0000", mid = "#FFFF00", high = "#00FF00", midpoint = 50, limits = c(0, 100), na.value = "grey") +
     theme_minimal() +
     theme(legend.position = "none",
@@ -210,7 +207,7 @@ for (athlete in athletes){
           plot.subtitle = element_text(hjust = 0.5, vjust = -10, size = 32, color = "white")
     )
   
-  avgVel <- combined_data %>% 
+  avgVel <- filteredHittrax %>% 
     ggplot(aes(x = `AvgVel Rank`, y = "")) +
     geom_segment(aes(x = 0, xend = 100, y = "", yend = ""), color = "#9b9b9b", linewidth = 1) +
     geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
@@ -218,10 +215,10 @@ for (athlete in athletes){
     geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
     geom_point(aes(fill = `AvgVel Rank`), color = "black", pch = 21, size = 12) +
     geom_text(aes(label = round(`AvgVel Rank`)), size = 10, fontface = "bold") +
-    labs(title = paste(round(combined_data$AvgVel, digits = 1), "MPH"),
-         subtitle = paste("MOM Change:", combined_data$AvgVel_Monthly_Change, 
-                          "| YTD Change:", combined_data$AvgVel_YTD_Change,
-                          "\nLevel Rank:", combined_data$AvgVel_Rank, "/", combined_data$Total_Players)) +
+    labs(title = paste(round(filteredHittrax$AvgVel, digits = 1), "MPH"),
+         subtitle = paste("MOM Change:", filteredHittrax$AvgVel_Monthly_Change, 
+                          "| YTD Change:", filteredHittrax$AvgVel_YTD_Change,
+                          "\nLevel Rank:", filteredHittrax$AvgVel_Rank, "/", filteredHittrax$Total_Players)) +
     scale_fill_gradient2(low = "#FF0000", mid = "#FFFF00", high = "#00FF00", midpoint = 50, limits = c(0, 100), na.value = "grey") +
     theme_minimal() +
     theme(legend.position = "none",
@@ -238,7 +235,7 @@ for (athlete in athletes){
           plot.subtitle = element_text(hjust = 0.5, vjust = -10, size = 32, color = "white")
     )
   
-  maxDist <- combined_data %>% 
+  maxDist <- filteredHittrax %>% 
     ggplot(aes(x = `MaxDist Rank`, y = "")) +
     geom_segment(aes(x = 0, xend = 100, y = "", yend = ""), color = "#9b9b9b", linewidth = 1) +
     geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
@@ -246,10 +243,10 @@ for (athlete in athletes){
     geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
     geom_point(aes(fill = `MaxDist Rank`), color = "black", pch = 21, size = 12) +
     geom_text(aes(label = round(`MaxDist Rank`)), size = 10, fontface = "bold") +
-    labs(title = paste(round(combined_data$MaxDist_CumMax, digits = 1), "Feet"),
-         subtitle = paste("MOM Change:", combined_data$MaxDist_Monthly_Change, 
-                          "| YTD Change:", combined_data$MaxDist_YTD_Change,
-                          "\nLevel Rank:", combined_data$MaxDist_Rank, "/", combined_data$Total_Players)) +
+    labs(title = paste(round(filteredHittrax$MaxDist_CumMax, digits = 1), "Feet"),
+         subtitle = paste("MOM Change:", filteredHittrax$MaxDist_Monthly_Change, 
+                          "| YTD Change:", filteredHittrax$MaxDist_YTD_Change,
+                          "\nLevel Rank:", filteredHittrax$MaxDist_Rank, "/", filteredHittrax$Total_Players)) +
     scale_fill_gradient2(low = "#FF0000", mid = "#FFFF00", high = "#00FF00", midpoint = 50, limits = c(0, 100), na.value = "grey") +
     theme_minimal() +
     theme(legend.position = "none",
@@ -266,7 +263,7 @@ for (athlete in athletes){
           plot.subtitle = element_text(hjust = 0.5, vjust = -10, size = 32, color = "white")
     )
   
-  avgDist <- combined_data %>% 
+  avgDist <- filteredHittrax %>% 
     ggplot(aes(x = `AvgDist Rank`, y = "")) +
     geom_segment(aes(x = 0, xend = 100, y = "", yend = ""), color = "#9b9b9b", linewidth = 1) +
     geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
@@ -274,10 +271,10 @@ for (athlete in athletes){
     geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
     geom_point(aes(fill = `AvgDist Rank`), color = "black", pch = 21, size = 12) +
     geom_text(aes(label = round(`AvgDist Rank`)), size = 10, fontface = "bold") +
-    labs(title = paste(round(combined_data$AvgDist, digits = 1), "Feet"),
-         subtitle = paste("MOM Change:", combined_data$AvgDist_Monthly_Change, 
-                          "| YTD Change:", combined_data$AvgDist_YTD_Change,
-                          "\nLevel Rank:", combined_data$AvgDist_Rank, "/", combined_data$Total_Players)) +
+    labs(title = paste(round(filteredHittrax$AvgDist, digits = 1), "Feet"),
+         subtitle = paste("MOM Change:", filteredHittrax$AvgDist_Monthly_Change, 
+                          "| YTD Change:", filteredHittrax$AvgDist_YTD_Change,
+                          "\nLevel Rank:", filteredHittrax$AvgDist_Rank, "/", filteredHittrax$Total_Players)) +
     scale_fill_gradient2(low = "#FF0000", mid = "#FFFF00", high = "#00FF00", midpoint = 50, limits = c(0, 100), na.value = "grey") +
     theme_minimal() +
     theme(legend.position = "none",
@@ -310,12 +307,27 @@ for (athlete in athletes){
   pitchCharts4 <- image_read(paste0("Futures Reports Images/",athlete," - playerAvgDistPercentiles.png"))
   PitchingReport5 <- image_composite(PitchingReport4, pitchCharts4, offset= "+1450+1360")
   
-  player_data <- combined_data %>%
-    select("Bat Speed (mph)", "Rotational Acceleration (g)", "Power (kW)", "On Plane Efficiency (%)", 
+  filteredBlast <- blastData %>% 
+    filter(Month == "September" & Name == athlete)
+  
+  player_data <- filteredBlast %>%
+    group_by(`Swing Details`) %>% 
+    summarise(
+      `Bat Speed (mph)` = round(mean(`Bat Speed (mph)`, na.rm = TRUE), 1),
+      `Peak Hand Speed (mph)` = round(mean(`Peak Hand Speed (mph)`, na.rm = TRUE), 1),
+      `Rotational Acceleration (g)` = round(mean(`Rotational Acceleration (g)`, na.rm = TRUE), 1),
+      `Power (kW)` = round(mean(`Power (kW)`, na.rm = TRUE), 1),
+      `On Plane Efficiency (%)` = round(mean(`On Plane Efficiency (%)`, na.rm = TRUE), 1),
+      `Attack Angle (deg)` = round(mean(`Attack Angle (deg)`, na.rm = TRUE), 1),
+      `Early Connection (deg)` = round(mean(`Early Connection (deg)`, na.rm = TRUE), 1),
+      `Connection at Impact (deg)` = round(mean(`Connection at Impact (deg)`, na.rm = TRUE), 1),
+      `Vertical Bat Angle (deg)` = round(mean(`Vertical Bat Angle (deg)`, na.rm = TRUE), 1)
+    ) %>%
+    select("Swing Details", "Bat Speed (mph)", "Rotational Acceleration (g)", "Power (kW)", "On Plane Efficiency (%)", 
            "Attack Angle (deg)", "Early Connection (deg)", "Connection at Impact (deg)", "Vertical Bat Angle (deg)")
   
   # Adjust column names
-  names(player_data) <- c("Bat Speed\n(mph)", "Rotational\nAcceleration (g)", "Power\n(kW)", 
+  names(player_data) <- c("Swing Details", "Bat Speed\n(mph)", "Rotational\nAcceleration (g)", "Power\n(kW)", 
                           "On Plane\nEfficiency (%)", "Attack Angle\n(deg)", "Early Connection\n(deg)", 
                           "Connection at\nImpact (deg)", "Vertical Bat\nAngle (deg)")
   
@@ -333,74 +345,94 @@ for (athlete in athletes){
   goals_data <- as.data.frame(matrix(NA, ncol=ncol(player_data), nrow=1))
   colnames(goals_data) <- colnames(player_data)
   
-  if(current_level %in% c("Collegiate")) {
-    goals_data$`Bat Speed\n(mph)` <- "75"
-    goals_data$`Rotational\nAcceleration (g)` <- "16"
-    goals_data$`On Plane\nEfficiency (%)` <- "85"
-    goals_data$`Power\n(kW)` <- "6.0"
-    goals_data$`Attack Angle\n(deg)` <- "6 - 10"
-    goals_data$`Early Connection\n(deg)` <- "85 - 105"
-    goals_data$`Connection at\nImpact (deg)` <- "90 - 95"
-    goals_data$`Vertical Bat\nAngle (deg)` <- "-27 to -37"
-  } else if(current_level %in% c("Baseball_L3")) {
-    goals_data$`Bat Speed\n(mph)` <- "65"
-    goals_data$`Rotational\nAcceleration (g)` <- "13"
-    goals_data$`On Plane\nEfficiency (%)` <- "80"
-    goals_data$`Power\n(kW)` <- "4.5"
-    goals_data$`Attack Angle\n(deg)` <- "8 - 12"
-    goals_data$`Early Connection\n(deg)` <- "85 - 105"
-    goals_data$`Connection at\nImpact (deg)` <- "90 - 95"
-    goals_data$`Vertical Bat\nAngle (deg)` <- "-27 to -37"
-  } else if (current_level %in% c("Softball_L3")) {
-    goals_data$`Bat Speed\n(mph)` <- "65"
-    goals_data$`Rotational\nAcceleration (g)` <- "12"
-    goals_data$`On Plane\nEfficiency (%)` <- "80"
-    goals_data$`Power\n(kW)` <- "3.5"
-    goals_data$`Attack Angle\n(deg)` <- "6 - 10"
-    goals_data$`Early Connection\n(deg)` <- "85 - 105"
-    goals_data$`Connection at\nImpact (deg)` <- "90 - 95"
-    goals_data$`Vertical Bat\nAngle (deg)` <- "-27 to -37"
-  } else if(current_level %in% c("Baseball_L2")) {
-    goals_data$`Bat Speed\n(mph)` <- "55"
-    goals_data$`Rotational\nAcceleration (g)` <- "10"
-    goals_data$`On Plane\nEfficiency (%)` <- "70"
-    goals_data$`Power\n(kW)` <- "2.75"
-    goals_data$`Attack Angle\n(deg)` <- "8 - 12"
-    goals_data$`Early Connection\n(deg)` <- "85 - 110"
-    goals_data$`Connection at\nImpact (deg)` <- "85 - 95"
-    goals_data$`Vertical Bat\nAngle (deg)` <- "-20 to -30"
-  } else if (current_level %in% c("Softball_L2")) {
-    goals_data$`Bat Speed\n(mph)` <- "55"
-    goals_data$`Rotational\nAcceleration (g)` <- "10"
-    goals_data$`On Plane\nEfficiency (%)` <- "70"
-    goals_data$`Power\n(kW)` <- "1.75"
-    goals_data$`Attack Angle\n(deg)` <- "6 - 10"
-    goals_data$`Early Connection\n(deg)` <- "85 - 110"
-    goals_data$`Connection at\nImpact (deg)` <- "85 - 95"
-    goals_data$`Vertical Bat\nAngle (deg)` <- "-20 to -30"
-  } else if(current_level %in% c("Baseball_L1")) {
-    goals_data$`Bat Speed\n(mph)` <- "45"
-    goals_data$`Rotational\nAcceleration (g)` <- "7.5"
-    goals_data$`On Plane\nEfficiency (%)` <- "60"
-    goals_data$`Power\n(kW)` <- "1.0"
-    goals_data$`Attack Angle\n(deg)` <- "5 - 15"
-    goals_data$`Early Connection\n(deg)` <- "80 - 110"
-    goals_data$`Connection at\nImpact (deg)` <- "80 - 100"
-    goals_data$`Vertical Bat\nAngle (deg)` <- "-15 to -25"
-  } else if (current_level %in% c("Softball_L1")) {
-    goals_data$`Bat Speed\n(mph)` <- "45"
-    goals_data$`Rotational\nAcceleration (g)` <- "6"
-    goals_data$`On Plane\nEfficiency (%)` <- "60"
-    goals_data$`Power\n(kW)` <- "1.0"
-    goals_data$`Attack Angle\n(deg)` <- "6 - 14"
-    goals_data$`Early Connection\n(deg)` <- "80 - 110"
-    goals_data$`Connection at\nImpact (deg)` <- "80 - 100"
-    goals_data$`Vertical Bat\nAngle (deg)` <- "-15 to -25"
+  # Fetch the group of the current player
+  current_level_blast <- unique(filteredBlast$`Reporting Level (Age-Dependent)`)[1]
+  current_gender_blast <- unique(filteredBlast$Gender)[1]
+  
+  goals_data$`Swing Details` <- " "
+  
+  if(current_gender_blast == "Male" && current_level_blast %in% c("Professional", "Collegiate", "L1", "L2", "L3")) {
+    if(current_level_blast %in% c("Collegiate", "Professional")) {
+      goals_data$`Bat Speed\n(mph)` <- "75"
+      goals_data$`Rotational\nAcceleration (g)` <- "16"
+      goals_data$`On Plane\nEfficiency (%)` <- "85"
+      goals_data$`Power\n(kW)` <- "6.0"
+      goals_data$`Attack Angle\n(deg)` <- "6 - 10"
+      goals_data$`Early Connection\n(deg)` <- "85 - 105"
+      goals_data$`Connection at\nImpact (deg)` <- "90 - 95"
+      goals_data$`Vertical Bat\nAngle (deg)` <- "-27 to -37"
+    } else if(current_level_blast == "L3") {
+      goals_data$`Bat Speed\n(mph)` <- "65"
+      goals_data$`Rotational\nAcceleration (g)` <- "13"
+      goals_data$`On Plane\nEfficiency (%)` <- "80"
+      goals_data$`Power\n(kW)` <- "4.5"
+      goals_data$`Attack Angle\n(deg)` <- "8 - 12"
+      goals_data$`Early Connection\n(deg)` <- "85 - 105"
+      goals_data$`Connection at\nImpact (deg)` <- "90 - 95"
+      goals_data$`Vertical Bat\nAngle (deg)` <- "-27 to -37"
+    } else if(current_level_blast == "L2") {
+      goals_data$`Bat Speed\n(mph)` <- "55"
+      goals_data$`Rotational\nAcceleration (g)` <- "10"
+      goals_data$`On Plane\nEfficiency (%)` <- "70"
+      goals_data$`Power\n(kW)` <- "2.75"
+      goals_data$`Attack Angle\n(deg)` <- "8 - 12"
+      goals_data$`Early Connection\n(deg)` <- "85 - 110"
+      goals_data$`Connection at\nImpact (deg)` <- "85 - 95"
+      goals_data$`Vertical Bat\nAngle (deg)` <- "-20 to -30"
+    } else if(current_level_blast == " L1") {
+      goals_data$`Bat Speed\n(mph)` <- "45"
+      goals_data$`Rotational\nAcceleration (g)` <- "7.5"
+      goals_data$`On Plane\nEfficiency (%)` <- "60"
+      goals_data$`Power\n(kW)` <- "1.0"
+      goals_data$`Attack Angle\n(deg)` <- "5 - 15"
+      goals_data$`Early Connection\n(deg)` <- "80 - 110"
+      goals_data$`Connection at\nImpact (deg)` <- "80 - 100"
+      goals_data$`Vertical Bat\nAngle (deg)` <- "-15 to -25"
+    }
+  } else if(current_gender_blast == "Female" && current_level_blast %in% c("Collegiate", "L1", "L2", "L3")) {
+    if(current_level_blast %in% c("Collegiate", "Professional")) {
+      goals_data$`Bat Speed\n(mph)` <- "75"
+      goals_data$`Rotational\nAcceleration (g)` <- "16"
+      goals_data$`On Plane\nEfficiency (%)` <- "85"
+      goals_data$`Power\n(kW)` <- "6.0"
+      goals_data$`Attack Angle\n(deg)` <- "6 - 10"
+      goals_data$`Early Connection\n(deg)` <- "85 - 105"
+      goals_data$`Connection at\nImpact (deg)` <- "90 - 95"
+      goals_data$`Vertical Bat\nAngle (deg)` <- "-27 to -37"
+    } else if(current_level_blast == "L3") {
+      goals_data$`Bat Speed\n(mph)` <- "65"
+      goals_data$`Rotational\nAcceleration (g)` <- "12"
+      goals_data$`On Plane\nEfficiency (%)` <- "80"
+      goals_data$`Power\n(kW)` <- "3.5"
+      goals_data$`Attack Angle\n(deg)` <- "6 - 10"
+      goals_data$`Early Connection\n(deg)` <- "85 - 105"
+      goals_data$`Connection at\nImpact (deg)` <- "90 - 95"
+      goals_data$`Vertical Bat\nAngle (deg)` <- "-27 to -37"
+    } else if(current_level_blast == "L2") {
+      goals_data$`Bat Speed\n(mph)` <- "55"
+      goals_data$`Rotational\nAcceleration (g)` <- "10"
+      goals_data$`On Plane\nEfficiency (%)` <- "70"
+      goals_data$`Power\n(kW)` <- "1.75"
+      goals_data$`Attack Angle\n(deg)` <- "6 - 10"
+      goals_data$`Early Connection\n(deg)` <- "85 - 110"
+      goals_data$`Connection at\nImpact (deg)` <- "85 - 95"
+      goals_data$`Vertical Bat\nAngle (deg)` <- "-20 to -30"
+    } else if(current_level_blast == " L1") {
+      goals_data$`Bat Speed\n(mph)` <- "45"
+      goals_data$`Rotational\nAcceleration (g)` <- "6"
+      goals_data$`On Plane\nEfficiency (%)` <- "60"
+      goals_data$`Power\n(kW)` <- "1.0"
+      goals_data$`Attack Angle\n(deg)` <- "6 - 14"
+      goals_data$`Early Connection\n(deg)` <- "80 - 110"
+      goals_data$`Connection at\nImpact (deg)` <- "80 - 100"
+      goals_data$`Vertical Bat\nAngle (deg)` <- "-15 to -25"
+    }
   } else {
     # If none of the conditions are met, set goals_data to NULL
     goals_data <- NULL
   }
   
+
   # Combine the dataframes only if goals_data is not NULL
   if (!is.null(goals_data)) {
     combined_player_data <- rbind(player_data, goals_data)
@@ -408,14 +440,14 @@ for (athlete in athletes){
     combined_player_data <- player_data
   }
   
-  # Assuming combined_player_data is the final dataframe that needs the new column
-  row_descriptions <- c("Nov 2023", "Level Goals")
-  
-  # Add the new column to the front of the dataframe
-  combined_player_data <- cbind(" " = row_descriptions, combined_player_data)
-  
-  combined_player_data %>% gt()
-  
+  # # Initialize an empty vector (or NA) with the length equal to the number of rows in combined_player_data
+  # row_descriptions <- rep("", nrow(combined_player_data))
+  # 
+  # # Set the last element of the vector to "Level Goals"
+  # row_descriptions[nrow(combined_player_data)] <- "Level Goals"
+  # 
+  # # Add the new column to the front of the dataframe
+  # combined_player_data <- cbind(" " = row_descriptions, combined_player_data)
   
   transparent_theme <- ttheme_minimal(
     core = list(fg_params = list(col = "white"), bg_params = list(fill = "transparent", col = NA)),
@@ -424,7 +456,7 @@ for (athlete in athletes){
     padding = unit(c(4, 4), "mm")
   )
   
-  png(paste0("Futures Reports Images/",athlete,"- hittingSummary.png"),height=1, width=10.5,units = "in",res = 225, bg = "transparent")
+  png(paste0("Futures Reports Images/",athlete,"- hittingSummary.png"),height=1, width=11,units = "in",res = 225, bg = "transparent")
   table2 <- tableGrob(combined_player_data, rows = NULL, theme = transparent_theme)
   grid.arrange(table2)
   dev.off()
@@ -436,7 +468,7 @@ for (athlete in athletes){
   if (!is.null(goals_data)) {
     
     red_ranges <- list()
-    if (current_level %in% c("Baseball_L1", "Softball_L1")) {
+    if (current_level == " L1") {
       red_ranges$bat_speed = list(xmin = 30, xmax = -Inf)
       red_ranges$rot_accel = list(ymin = 2, ymax = -Inf)
       red_ranges$on_plane_eff = list(xmin = 60, xmax = -Inf)
@@ -444,7 +476,7 @@ for (athlete in athletes){
       red_ranges$vertical_angle = list(ymin = -Inf, ymax = 15, ymin2 = 40, ymax2 = Inf)
       red_ranges$early_connection = list(ymin = -Inf, ymax = 80, ymin2 = 110, ymax2 = Inf)
       red_ranges$connection_impact = list(ymin = -Inf, ymax = 75, ymin2 = 100, ymax2 = Inf)
-    } else if (current_level %in% c("Baseball_L2", "Softball_L2")) {
+    } else if (current_level == "L2") {
       red_ranges$bat_speed = list(xmin = 40, xmax = -Inf)
       red_ranges$rot_accel = list(ymin = 4, ymax = -Inf)
       red_ranges$on_plane_eff = list(xmin = 60, xmax = -Inf)
@@ -452,7 +484,7 @@ for (athlete in athletes){
       red_ranges$vertical_angle = list(ymin = -Inf, ymax = 15, ymin2 = 45, ymax2 = Inf)
       red_ranges$early_connection = list(ymin = -Inf, ymax = 85, ymin2 = 110, ymax2 = Inf)
       red_ranges$connection_impact = list(ymin = -Inf, ymax = 80, ymin2 = 95, ymax2 = Inf)
-    } else if (current_level %in% c("Baseball_L3", "Softball_L3", "Collegiate")) {
+    } else if (current_level %in% c("L3", "Collegiate", "Professional")) {
       red_ranges$bat_speed = list(xmin = 50, xmax = -Inf)
       red_ranges$rot_accel = list(ymin = 8, ymax = -Inf)
       red_ranges$on_plane_eff = list(xmin = 60, xmax = -Inf)
@@ -462,7 +494,7 @@ for (athlete in athletes){
       red_ranges$connection_impact = list(ymin = -Inf, ymax = 85, ymin2 = 95, ymax2 = Inf)
     }
     
-    if (current_level %in% c("Baseball_L1", "Softball_L1")) {
+    if (current_level %in% c(" L1")) {
       contact_xlim <- c(20, 80)
       contact_ylim <- c(-10, 30)
     } else {
@@ -475,11 +507,11 @@ for (athlete in athletes){
     bat_speed_goal <- as.numeric(goals_data$`Bat Speed\n(mph)`)
     rot_accel_goal <- as.numeric(goals_data$`Rotational\nAcceleration (g)`)
     
-    power_graph <- ggplot(combined_data) +
+    power_graph <- ggplot(filteredBlast) +
       coord_cartesian(xlim = contact_xlim, ylim = contact_ylim) +
       geom_rect(aes(xmin = bat_speed_goal, xmax = Inf, ymin = rot_accel_goal, ymax = Inf), fill = "#00FF00", alpha = 0.25) +
       geom_rect(aes(xmin = red_ranges$bat_speed$xmin, xmax = red_ranges$bat_speed$xmax, ymin = red_ranges$rot_accel$ymin, ymax = red_ranges$rot_accel$ymax), fill = "#FF2400", alpha = 0.10) +
-      geom_point(aes(x = `Bat Speed (mph)`, y = `Rotational Acceleration (g)`), color = "white", size = 4) +
+      geom_point(aes(x = `Bat Speed (mph)`, y = `Rotational Acceleration (g)`), color = `Swing Details`, size = 4) +
       theme_minimal() +
       theme(legend.position = "none",
             panel.grid = element_line(color = col_grid),
@@ -493,12 +525,12 @@ for (athlete in athletes){
     attack_angle_max <- as.numeric(attack_angle_goal[[1]][2])
     on_plane_eff_goal <- as.numeric(goals_data$`On Plane\nEfficiency (%)`)
     
-    contact_graph <- ggplot(combined_data) +
+    contact_graph <- ggplot(filteredBlast) +
       coord_cartesian(xlim = c(20, 100), ylim = c(-5, 25)) +
       geom_rect(aes(xmin = on_plane_eff_goal, xmax = Inf, ymin = attack_angle_min, ymax = attack_angle_max), fill = "#00FF00", alpha = 0.25) +
       geom_rect(aes(xmin = red_ranges$on_plane_eff$xmin, xmax = red_ranges$on_plane_eff$xmax, ymin = red_ranges$attack_angle$ymin, ymax = red_ranges$attack_angle$ymax), fill = "#FF2400", alpha = 0.10) +
       geom_rect(aes(xmin = red_ranges$on_plane_eff$xmin, xmax = red_ranges$on_plane_eff$xmax, ymin = red_ranges$attack_angle$ymin2, ymax = red_ranges$attack_angle$ymax2), fill = "#FF2400", alpha = 0.10) +
-      geom_point(aes(x = `On Plane Efficiency (%)`, y = `Attack Angle (deg)`), color = "white", size = 4) +
+      geom_point(aes(x = `On Plane Efficiency (%)`, y = `Attack Angle (deg)`), color = `Swing Details`, size = 4) +
       theme_minimal() +
       theme(legend.position = "none",
             panel.grid = element_line(color = col_grid),
@@ -511,12 +543,12 @@ for (athlete in athletes){
     early_connection_min <- as.numeric(early_connection_goal[[1]][1])
     early_connection_max <- as.numeric(early_connection_goal[[1]][2])
     
-    load_graph <- ggplot(combined_data) +
+    load_graph <- ggplot(filteredBlast) +
       coord_cartesian(xlim = c(0, -60), ylim = c(60, 140)) +
       geom_rect(aes(xmin = Inf, xmax = -Inf, ymin = early_connection_min, ymax = early_connection_max), fill = "#00FF00", alpha = 0.25) +
       geom_rect(aes(xmin = Inf, xmax = -Inf, ymin = red_ranges$early_connection$ymin, ymax = red_ranges$early_connection$ymax), fill = "#FF2400", alpha = 0.10) +
       geom_rect(aes(xmin = Inf, xmax = -Inf, ymin = red_ranges$early_connection$ymin2, ymax = red_ranges$early_connection$ymax2), fill = "#FF2400", alpha = 0.10) +
-      geom_point(aes(x = `Vertical Bat Angle (deg)`, y = `Early Connection (deg)`), color = "white", size = 4) +
+      geom_point(aes(x = `Vertical Bat Angle (deg)`, y = `Early Connection (deg)`), color = `Swing Details`, size = 4) +
       theme_minimal() +
       theme(legend.position = "none",
             panel.grid = element_line(color = col_grid),
@@ -529,12 +561,12 @@ for (athlete in athletes){
     connection_impact_min <- as.numeric(connection_impact_goal[[1]][1])
     connection_impact_max <- as.numeric(connection_impact_goal[[1]][2])
     
-    impact_graph <- ggplot(combined_data) +
+    impact_graph <- ggplot(filteredBlast) +
       coord_cartesian(xlim = c(0, -60), ylim = c(60, 110)) +
       geom_rect(aes(xmin = Inf, xmax = -Inf, ymin = connection_impact_min, ymax = connection_impact_max), fill = "#00FF00", alpha = 0.25) +
       geom_rect(aes(xmin = Inf, xmax = -Inf, ymin = red_ranges$connection_impact$ymin, ymax = red_ranges$connection_impact$ymax), fill = "#FF2400", alpha = 0.10) +
       geom_rect(aes(xmin = Inf, xmax = -Inf, ymin = red_ranges$connection_impact$ymin2, ymax = red_ranges$connection_impact$ymax2), fill = "#FF2400", alpha = 0.10) +
-      geom_point(aes(x = `Vertical Bat Angle (deg)`, y = `Connection at Impact (deg)`), color = "white", size = 4) +
+      geom_point(aes(x = `Vertical Bat Angle (deg)`, y = `Connection at Impact (deg)`), color = `Swing Details`, size = 4) +
       theme_minimal() +
       theme(legend.position = "none",
             panel.grid = element_line(color = col_grid),
@@ -543,25 +575,25 @@ for (athlete in athletes){
             plot.title = element_text(color = "white", size = 18),
             plot.subtitle = element_text(color = "white", size = 16))
   } else {
-    power_graph <- ggplot(combined_data) +
+    power_graph <- ggplot(filteredBlast) +
       geom_point(aes(x = `Bat Speed (mph)`, y = `Rotational Acceleration (g)`)) +
       coord_cartesian(xlim = c(30, 80), ylim = c(0, 30)) +
       theme_minimal() +
       theme(legend.position = "none")
     
-    contact_graph <- ggplot(combined_data) +
+    contact_graph <- ggplot(filteredBlast) +
       geom_point(aes(x = `On Plane Efficiency (%)`, y = `Attack Angle (deg)`)) +
       coord_cartesian(xlim = c(20, 100), ylim = c(-5, 25)) +
       theme_minimal() +
       theme(legend.position = "none")
     
-    load_graph <- ggplot(combined_data) +
+    load_graph <- ggplot(filteredBlast) +
       geom_point(aes(x = `Vertical Bat Angle (deg)`, y = `Early Connection (deg)`)) +
       coord_cartesian(xlim = c(0, -60), ylim = c(60, 140)) +
       theme_minimal() +
       theme(legend.position = "none")
     
-    impact_graph <- ggplot(combined_data) +
+    impact_graph <- ggplot(filteredBlast) +
       geom_point(aes(x = `Vertical Bat Angle (deg)`, y = `Connection at Impact (deg)`)) +
       coord_cartesian(xlim = c(0, -60), ylim = c(60, 110)) +
       theme_minimal() +
