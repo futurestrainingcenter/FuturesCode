@@ -18,8 +18,8 @@ library(showtext)
 font_add(family = "Good Times", regular = "good times rg.otf")
 showtext_auto()
 
-clientData <- read.csv("/Users/watts/Downloads/FullClientList.csv")
-attendanceData <- read.csv("/Users/watts/Downloads/StrengthAttendance_data.csv")
+clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv")
+attendanceData <- read_csv("/Users/watts/Downloads/StrengthAttendance_data.csv")
 proteusData<- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/ProteusPercentiles.csv")
 teambuildrData <- read_csv("/Users/watts/Downloads/Teambuildr Raw Data Report.csv")
 CMJdata <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/CMJpercentiles.csv")
@@ -43,7 +43,7 @@ calculate_age <- function(birthdate) {
 }
 
 # Create a new column "Age" that calculates their age
-clientData$Age <- sapply(clientData$`field.general.7.dl_date`, calculate_age)
+clientData$Age <- sapply(clientData$`field-general-7.dl_date`, calculate_age)
 colnames(clientData)[colnames(clientData) == "Client"] <- "Name"
 
 merged_data <- left_join(teambuildrData, clientData, by="Name")
@@ -78,7 +78,7 @@ for (exercise in exercises) {
     filter(!(`Exercise Name` == exercise & (`Highest Max` < lower_bound | `Highest Max` > upper_bound)))
 } 
 
-athletes <- unique(attendanceData$Client.name)
+athletes <- unique(attendanceData$`Client name`)
 
 col_grid <- rgb(235, 235, 235, 50, maxColorValue = 255)
 
@@ -100,8 +100,8 @@ if(!any(clientData$Name == athlete)) {
   player_profile <- data.frame(
     Name = NA, 
     Age = NA, 
-    Reporting.Level..Age.Dependent. = NA,
-    Position..Baseball.Softball. = NA, 
+    `Reporting Level (Age-Dependent)` = NA,
+    `Position (Baseball/Softball)` = NA, 
     Height = NA,
     stringsAsFactors = FALSE
   )
@@ -109,7 +109,7 @@ if(!any(clientData$Name == athlete)) {
 } else {
   player_profile <- clientData %>%
     filter(Name == athlete) %>%
-    select(Name, Age, Reporting.Level..Age.Dependent., Position..Baseball.Softball., Height)
+    select(Name, Age, `Reporting Level (Age-Dependent)`, `Position (Baseball/Softball)`, Height)
   names(player_profile) <- c("Name:", "Age:", "Level:", "Position:", "Height:")
 }
 
@@ -195,7 +195,7 @@ if(!any(CMJdata$Name == athlete)) {
 ########################################################################################################
 
 attendance_plot_data <- attendanceData %>%
-  filter(Client.name == athlete) %>% 
+  filter(`Client name` == athlete) %>% 
   mutate(`Attendance Score` = round((Attended / 26) * 3, digits = 1))
 
 attendance_score <- max(attendance_plot_data$`Attendance Score`, na.rm = TRUE)
@@ -213,7 +213,7 @@ get_color <- function(score) {
 }
 
 attendance_plot <- attendance_plot_data %>% 
-  ggplot(aes(x = Client.name, y = `Attendance Score`)) +
+  ggplot(aes(x = `Client name`, y = `Attendance Score`)) +
   geom_col(aes(fill = get_color(`Attendance Score`))) +
   geom_col(aes(y = 3), alpha = 0.5, color = "black") +
   geom_text(aes(y = 1.5, label = paste(attendance_score)), size = 14, fontface = "bold", color = "white") +
@@ -319,7 +319,7 @@ if(any(proteusData$Name == athlete)) {
     geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
     geom_point(aes(fill = max(AccelerationPercentileRank)), color = "black", pch = 21, size = 12) +
     geom_text(aes(label = round(max(AccelerationPercentileRank))), size = 8, fontface = "bold") +
-    labs(title = paste("Speed Max: ", round(maxAcc, digits = 1), " m/s2", sep = "")) +
+    labs(title = paste("Acceleration Max: ", round(maxAcc, digits = 1), " m/s2", sep = "")) +
     scale_fill_gradient2(low = "#FF0000", mid = "#FFFF00", high = "#00FF00", midpoint = 50, limits = c(0, 100), na.value = "grey") +
     theme_minimal() +
     theme(legend.position = "none",
@@ -332,7 +332,7 @@ if(any(proteusData$Name == athlete)) {
           axis.ticks.x = element_blank(),
           axis.text.x = element_blank(),
           axis.title.x = element_blank()) +
-    annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
+    annotate("text", x = 0, y = 1, label = "Acceleration Max: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
     annotate("text", x = 100, y = 1, label = paste(round(maxAcc, digits = 1), " m/s²", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
   
   core_power_percentile_score <- max(corePower_graph_data$PowerPercentileRank, na.rm = TRUE)
@@ -618,7 +618,7 @@ if (athlete_in_CMJdata) {
           axis.ticks.x = element_blank(),
           axis.text.x = element_blank(),
           axis.title.x = element_blank()) +
-    annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
+    annotate("text", x = 0, y = 1, label = "Acceleration Max: ", hjust = 0, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
     annotate("text", x = 100, y = 1, label = paste(round(maxCMJ, digits = 1), " N", sep = ""), hjust = 1, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
     asymmetry_annotations
   
@@ -761,7 +761,7 @@ if(any(proteusData$Name == athlete)) {
           axis.ticks.x = element_blank(),
           axis.text.x = element_blank(),
           axis.title.x = element_blank()) +
-    annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
+    annotate("text", x = 0, y = 1, label = "Acceleration Max: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
     annotate("text", x = 100, y = 1, label = paste("Push: ", round(max_acc_push, digits = 1), "m/s²\n",
                                                    "Pull: ", round(max_acc_pull, digits = 1), "m/s²"), hjust = 1, vjust = -0.65, color = "white", size = 8, family = "Good Times")
   
@@ -926,7 +926,7 @@ get_color_two <- function(score) {
 }
 
 if (any(scores == 0, na.rm = TRUE)) {
-  strengthScore_plot <- ggplot(data.frame(Client.name = "N/A", y = 50), aes(x = Client.name, y = y)) +
+  strengthScore_plot <- ggplot(data.frame(Name = "N/A", y = 50), aes(x = Name, y = y)) +
     geom_col(aes(y = 100), alpha = 0, color = "black") +
     geom_text(aes(label = "One or more scores are zero.\nPlease bring report to Futures Coaches to test."), size = 8, color = "white") +
     coord_flip() +
@@ -940,7 +940,7 @@ if (any(scores == 0, na.rm = TRUE)) {
       panel.background = element_blank())
 } else {
   strengthScore_plot <- attendance_plot_data %>% 
-    ggplot(aes(x = Client.name, y = strengthScore)) +
+    ggplot(aes(x = `Client name`, y = strengthScore)) +
     geom_col(aes(fill = get_color_two(strengthScore))) +
     geom_col(aes(y = 100), alpha = 0.5, color = "black") +
     geom_text(aes(y = 50, label = paste(strengthScore)), size = 14, fontface = "bold", color = "white") +

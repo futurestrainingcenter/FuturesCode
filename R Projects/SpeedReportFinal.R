@@ -18,8 +18,8 @@ library(showtext)
 font_add(family = "Good Times", regular = "good times rg.otf")
 showtext_auto()
 
-clientData <- read.csv("/Users/watts/Downloads/FullClientList.csv")
-attendanceData <- read.csv("/Users/watts/Downloads/SpeedAttendance_data.csv")
+clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv")
+attendanceData <- read_csv("/Users/watts/Downloads/SpeedAttendance_data.csv")
 hardNinety <- read.csv("/Volumes/COLE'S DATA/Data/Speed Report Data/Hard90percentiles.csv")
 accelerationData<- read_csv("/Volumes/COLE'S DATA/Data/Speed Report Data/AccelerationPercentiles.csv")
 maxVeloData <- read_csv("/Volumes/COLE'S DATA/Data/Speed Report Data/MaxVelocityPercentiles.csv")
@@ -41,7 +41,7 @@ calculate_age <- function(birthdate) {
 }
 
 # Create a new column "Age" that calculates their age
-clientData$Age <- sapply(clientData$`field.general.7.dl_date`, calculate_age)
+clientData$Age <- sapply(clientData$`field-general-7.dl_date`, calculate_age)
 colnames(clientData)[colnames(clientData) == "Client"] <- "Name"
 
 TemplatePageOne <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Speed Report Template.pdf")
@@ -49,7 +49,7 @@ IndexPage <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Speed Report Index.p
 
 setwd("/Users/watts/Documents/Futures Performance Center/Test")
 
-athletes <- unique(attendanceData$Client.name)
+athletes <- unique(attendanceData$`Client name`)
 
 col_grid <- rgb(235, 235, 235, 50, maxColorValue = 255)
 
@@ -68,8 +68,8 @@ for (athlete in athletes){
     player_profile <- data.frame(
       Name = NA, 
       Age = NA, 
-      Reporting.Level..Age.Dependent. = NA,
-      Position..Baseball.Softball. = NA, 
+      Level = NA,
+      Position = NA, 
       Height = NA,
       stringsAsFactors = FALSE
     )
@@ -77,7 +77,7 @@ for (athlete in athletes){
   } else {
     player_profile <- clientData %>%
       filter(Name == athlete) %>%
-      select(Name, Age, Reporting.Level..Age.Dependent., Position..Baseball.Softball., Height)
+      select(Name, Age, `Reporting Level (Age-Dependent)`, `Position (Baseball/Softball)`, Height)
     names(player_profile) <- c("Name:", "Age:", "Level:", "Position:", "Height:")
   }
   
@@ -145,7 +145,7 @@ for (athlete in athletes){
   ########################################################################################################
   
   attendance_plot_data <- attendanceData %>%
-    filter(Client.name == athlete) %>% 
+    filter(`Client name` == athlete) %>% 
     mutate(`Attendance Score` = round((Attended / 26) * 2, digits = 1))
   
   attendance_score <- max(attendance_plot_data$`Attendance Score`, na.rm = TRUE)
@@ -163,7 +163,7 @@ for (athlete in athletes){
   }
   
   attendance_plot <- attendance_plot_data %>% 
-    ggplot(aes(x = Client.name, y = `Attendance Score`)) +
+    ggplot(aes(x = `Client name`, y = `Attendance Score`)) +
     geom_col(aes(fill = get_color(`Attendance Score`))) +
     geom_col(aes(y = 2), alpha = 0.5, color = "black") +
     geom_text(aes(y = 1, label = paste(attendance_score)), size = 14, fontface = "bold", color = "white") +
@@ -695,7 +695,7 @@ for (athlete in athletes){
   }
   
   if (any(scores == 0, na.rm = TRUE)) {
-    speedScore_plot <- ggplot(data.frame(Client.name = "N/A", y = 50), aes(x = Client.name, y = y)) +
+    speedScore_plot <- ggplot(data.frame(Name = "N/A", y = 50), aes(x = Name, y = y)) +
       geom_col(aes(y = 100), alpha = 0, color = "black") +
       geom_text(aes(label = "One or more scores are zero.\nPlease bring report to Futures Coaches to test."), size = 8, color = "white") +
       coord_flip() +
@@ -708,7 +708,7 @@ for (athlete in athletes){
             panel.background = element_blank())
   } else {
     speedScore_plot <- attendance_plot_data %>% 
-      ggplot(aes(x = Client.name, y = speedScore)) +
+      ggplot(aes(x = `Client name`, y = speedScore)) +
       geom_col(aes(fill = get_color_two(speedScore))) +
       geom_col(aes(y = 100), alpha = 0.5, color = "black") +
       geom_text(aes(y = 50, label = paste(speedScore)), size = 14, fontface = "bold", color = "white") +

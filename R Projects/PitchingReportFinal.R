@@ -36,8 +36,8 @@ armCareData <- armCareData %>%
     `Exam Type` %in% c("Fresh - Quick", "Fresh - Full"),
     Month %in% c("October", "November"))
 
-clientData <- read.csv("/Users/watts/Downloads/FullClientList.csv")
-attendanceData <- read.csv("/Users/watts/Downloads/PitchingAttendance_data.csv")
+clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv")
+attendanceData <- read_csv("/Users/watts/Downloads/PitchingAttendance_data.csv")
 
 calculate_age <- function(birthdate) {
   if (is.na(birthdate)) {
@@ -50,7 +50,7 @@ calculate_age <- function(birthdate) {
 }
 
 # Create a new column "Age" that calculates their age
-clientData$Age <- sapply(clientData$`field.general.7.dl_date`, calculate_age)
+clientData$Age <- sapply(clientData$`field-general-7.dl_date`, calculate_age)
 colnames(clientData)[colnames(clientData) == "Client"] <- "Name"
 
 pitchers <- unique(gamefile$Pitcher)
@@ -74,7 +74,7 @@ for (pitcher in pitchers){
   player_profile <- clientData %>%
     filter(Name == pitcher) %>%
     mutate(GPA = NA, Weight = NA, School = NA, Class = NA, Attendance = NA, HT_WT = paste(Height, " / ", Weight)) %>% 
-    select(Name, Age, Reporting.Level..Age.Dependent., Position..Baseball.Softball., GPA, HT_WT, School, Class, Attendance)
+    select(Name, Age, `Reporting Level (Age-Dependent)`, `Position (Baseball/Softball)`, GPA, HT_WT, School, Class, Attendance)
   names(player_profile) <- c("Name:", "Age:", "Level:", "Position:", "GPA:", "Height/Weight:", "School:", "Class:", "Attendance:")
   
   player_profile <- player_profile %>% 
@@ -335,7 +335,7 @@ for (pitcher in pitchers){
   PitchingReport9 <- image_composite(PitchingReport8,pitchCharts7,offset= "+125+2700")
   
   attendance_plot_data <- attendanceData %>%
-    filter(Client.name == pitcher) %>% 
+    filter(`Client name` == pitcher) %>% 
     mutate(`Attendance Score` = round(pmin((Attended / 4) * 100, 100), digits = 2))
   
   attendance_score <- max(attendance_plot_data$`Attendance Score`, na.rm = TRUE)
@@ -355,7 +355,7 @@ for (pitcher in pitchers){
   # Check if all attendance scores are NA
   if (all(is.na(attendance_plot_data$`Attendance Score`))) {
     # Handle the scenario where all scores are missing
-    attendance_plot <- ggplot(data.frame(Client.name = "N/A", y = 50), aes(x = Client.name, y = y)) +
+    attendance_plot <- ggplot(data.frame(Name = "N/A", y = 50), aes(x = Name, y = y)) +
       geom_col(aes(y = 100), alpha = 0.5, color = "black") +
       geom_text(aes(y = 50, label = "NA"), size = 12, color = "white") +
       coord_flip() +
@@ -371,7 +371,7 @@ for (pitcher in pitchers){
   } else {
     # Existing code for when there are valid attendance scores
     attendance_plot <- attendance_plot_data %>% 
-      ggplot(aes(x = Client.name, y = `Attendance Score`)) +
+      ggplot(aes(x = `Client name`, y = `Attendance Score`)) +
       geom_col(aes(fill = get_color(`Attendance Score`))) +
       geom_col(aes(y = 100), alpha = 0.5, color = "black") +
       geom_text(aes(y = 50, label = paste(attendance_score, "%")), size = 14, fontface = "bold", color = "white") +

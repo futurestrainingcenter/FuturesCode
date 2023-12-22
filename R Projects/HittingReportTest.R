@@ -17,7 +17,8 @@ library(showtext)
 library(gt)
 library(gtExtras)
 library(flextable)
-library(webshot2) # webshot2 might handle transparency better
+library(webshot2)
+library(patchwork)
 
 font_add(family = "Good Times", regular = "good times rg.otf")
 showtext_auto()
@@ -52,7 +53,7 @@ blastData <- left_join(blastData, clientData, by = "Name")
 blastData <- blastData %>%
   group_by(Name) %>%
   mutate(MedianBatSpeed = median(`Bat Speed (mph)`, na.rm = TRUE)) %>%
-  filter(`Bat Speed (mph)` >= MedianBatSpeed)
+  filter(`Bat Speed (mph)` >= MedianBatSpeed & `Swing Details` %in% c("Front Toss Underhand", "In Game", "Pitching Machine", "Tee"))
 
 # blastData <- blastData %>%
 #   arrange(Name, match(Month, month.name)) %>%
@@ -454,7 +455,7 @@ for (athlete in athletes){
         cell_borders(
           sides = c("top"),
           color = "#3d9be9",
-          weight = px(3)
+          weight = px(5)
         )
       ),
       locations = list(
@@ -468,8 +469,8 @@ for (athlete in athletes){
       style = list(
         cell_borders(
           sides = c("top"),
-          color = "grey",
-          weight = px(3)
+          color = "white",
+          weight = px(5)
         )
       ),
       locations = list(
@@ -478,20 +479,23 @@ for (athlete in athletes){
           rows = "Goals"
         )
       )
+    ) %>% 
+    tab_options(
+      table.border.top.style = "hidden",
+      heading.border.lr.style = "hidden"
     )
   
-  gt_table
-  
-  # Save the table
-  gtsave(gt_table, file = paste0("Futures Reports Images/ ",athlete, "- hittingSummary.png"), vwidth = 1200, vheight = 300, expand = 0)
+  gtsave(gt_table, file = paste0("Futures Reports Images/ ",athlete, "- hittingSummary.png"), vwidth = 1200, vheight = 500, expand = 0)
   
   playerSummary2 <- image_read(paste0("Futures Reports Images/ ",athlete,"- hittingSummary.png"))
+  playerSummary2 <- playerSummary2 %>% 
+    image_transparent(color = "black")
   PitchingReport6 <- image_composite(PitchingReport5,playerSummary2,offset= "+100+1850")
   
   if (!is.null(player_data)) {
     
     red_ranges <- list()
-    if (current_level == " L1") {
+    if (current_level_blast == " L1") {
       red_ranges$bat_speed = list(xmin = 30, xmax = -Inf)
       red_ranges$rot_accel = list(ymin = 2, ymax = -Inf)
       red_ranges$on_plane_eff = list(xmin = 60, xmax = -Inf)
@@ -499,7 +503,7 @@ for (athlete in athletes){
       red_ranges$vertical_angle = list(ymin = -Inf, ymax = 15, ymin2 = 40, ymax2 = Inf)
       red_ranges$early_connection = list(ymin = -Inf, ymax = 80, ymin2 = 110, ymax2 = Inf)
       red_ranges$connection_impact = list(ymin = -Inf, ymax = 75, ymin2 = 100, ymax2 = Inf)
-    } else if (current_level == "L2") {
+    } else if (current_level_blast == "L2") {
       red_ranges$bat_speed = list(xmin = 40, xmax = -Inf)
       red_ranges$rot_accel = list(ymin = 4, ymax = -Inf)
       red_ranges$on_plane_eff = list(xmin = 60, xmax = -Inf)
@@ -507,7 +511,7 @@ for (athlete in athletes){
       red_ranges$vertical_angle = list(ymin = -Inf, ymax = 15, ymin2 = 45, ymax2 = Inf)
       red_ranges$early_connection = list(ymin = -Inf, ymax = 85, ymin2 = 110, ymax2 = Inf)
       red_ranges$connection_impact = list(ymin = -Inf, ymax = 80, ymin2 = 95, ymax2 = Inf)
-    } else if (current_level %in% c("L3", "Collegiate", "Professional")) {
+    } else if (current_level_blast %in% c("L3", "Collegiate", "Professional")) {
       red_ranges$bat_speed = list(xmin = 50, xmax = -Inf)
       red_ranges$rot_accel = list(ymin = 8, ymax = -Inf)
       red_ranges$on_plane_eff = list(xmin = 60, xmax = -Inf)
@@ -517,80 +521,58 @@ for (athlete in athletes){
       red_ranges$connection_impact = list(ymin = -Inf, ymax = 85, ymin2 = 95, ymax2 = Inf)
     }
     
-    if (current_level %in% c(" L1")) {
+    if (current_level_blast %in% c(" L1")) {
       contact_xlim <- c(20, 80)
       contact_ylim <- c(-10, 30)
     } else {
       contact_xlim <- c(30, 80)
       contact_ylim <- c(0, 30)
     }
-
+    
+    
+    
     bat_speed_goal <- as.numeric(goals_data$`Bat Speed (mph)`)
     rot_accel_goal <- as.numeric(goals_data$`Rotational Acceleration (g)`)
     
-    power_graph <- ggplot(filteredBlast) +
+    power_graph <- ggplot(player_data) +
       coord_cartesian(xlim = contact_xlim, ylim = contact_ylim) +
       annotate("rect", xmin = bat_speed_goal, xmax = Inf, ymin = rot_accel_goal, ymax = Inf, fill = "#00FF00", alpha = 0.25) +
       annotate("rect", xmin = red_ranges$bat_speed$xmin, xmax = red_ranges$bat_speed$xmax, ymin = red_ranges$rot_accel$ymin, ymax = red_ranges$rot_accel$ymax, fill = "#FF2400", alpha = 0.15) +
-      geom_point(aes(x = `Bat Speed (mph)`, y = `Rotational Acceleration (g)`, color = `Swing Details`)) +
-      theme_minimal() +
-      theme(legend.title= element_text(color = "white", size = 24),
-            legend.text = element_text(color = "white", size = 20),
-            panel.grid = element_line(color = col_grid),
-            axis.text=element_text(color = "white", size = 12),
-            axis.title = element_text(color = "white", size = 14))
+      geom_point(aes(x = `Bat Speed (mph)`, y = `Rotational Acceleration (g)`, color = `Swing Details`))
     
     attack_angle_goal <- strsplit(as.character(goals_data$`Attack Angle (deg)`), ' - ')
     attack_angle_min <- as.numeric(attack_angle_goal[[1]][1])
     attack_angle_max <- as.numeric(attack_angle_goal[[1]][2])
     on_plane_eff_goal <- as.numeric(goals_data$`On Plane Efficiency (%)`)
     
-    contact_graph <- ggplot(filteredBlast) +
+    contact_graph <- ggplot(player_data) +
       coord_cartesian(xlim = c(20, 100), ylim = c(-5, 25)) +
       annotate("rect", xmin = on_plane_eff_goal, xmax = Inf, ymin = attack_angle_min, ymax = attack_angle_max, fill = "#00FF00", alpha = 0.25) +
       annotate("rect", xmin = red_ranges$on_plane_eff$xmin, xmax = red_ranges$on_plane_eff$xmax, ymin = red_ranges$attack_angle$ymin, ymax = red_ranges$attack_angle$ymax, fill = "#FF2400", alpha = 0.15) +
       annotate("rect", xmin = red_ranges$on_plane_eff$xmin, xmax = red_ranges$on_plane_eff$xmax, ymin = red_ranges$attack_angle$ymin2, ymax = red_ranges$attack_angle$ymax2, fill = "#FF2400", alpha = 0.15) +
-      geom_point(aes(x = `On Plane Efficiency (%)`, y = `Attack Angle (deg)`, color = `Swing Details`)) +
-      theme_minimal() +
-      theme(legend.title= element_text(color = "white", size = 24),
-            legend.text = element_text(color = "white", size = 20),
-            panel.grid = element_line(color = col_grid),
-            axis.text=element_text(color = "white", size = 12),
-            axis.title = element_text(color = "white", size = 14))
+      geom_point(aes(x = `On Plane Efficiency (%)`, y = `Attack Angle (deg)`, color = `Swing Details`))
     
     early_connection_goal <- strsplit(as.character(goals_data$`Early Connection (deg)`), ' - ')
     early_connection_min <- as.numeric(early_connection_goal[[1]][1])
     early_connection_max <- as.numeric(early_connection_goal[[1]][2])
     
-    load_graph <- ggplot(filteredBlast) +
+    load_graph <- ggplot(player_data) +
       coord_cartesian(xlim = c(0, -60), ylim = c(60, 140)) +
       annotate("rect", xmin = Inf, xmax = -Inf, ymin = early_connection_min, ymax = early_connection_max, fill = "#00FF00", alpha = 0.25) +
       annotate("rect", xmin = Inf, xmax = -Inf, ymin = red_ranges$early_connection$ymin, ymax = red_ranges$early_connection$ymax, fill = "#FF2400", alpha = 0.15) +
       annotate("rect", xmin = Inf, xmax = -Inf, ymin = red_ranges$early_connection$ymin2, ymax = red_ranges$early_connection$ymax2, fill = "#FF2400", alpha = 0.15) +
-      geom_point(aes(x = `Vertical Bat Angle (deg)`, y = `Early Connection (deg)`, color = `Swing Details`)) +
-      theme_minimal() +
-      theme(legend.title= element_text(color = "white", size = 24),
-            legend.text = element_text(color = "white", size = 20),
-            panel.grid = element_line(color = col_grid),
-            axis.text=element_text(color = "white", size = 12),
-            axis.title = element_text(color = "white", size = 14))
+      geom_point(aes(x = `Vertical Bat Angle (deg)`, y = `Early Connection (deg)`, color = `Swing Details`))
     
     connection_impact_goal <- strsplit(as.character(goals_data$`Connection at Impact (deg)`), ' - ')
     connection_impact_min <- as.numeric(connection_impact_goal[[1]][1])
     connection_impact_max <- as.numeric(connection_impact_goal[[1]][2])
     
-    impact_graph <- ggplot(filteredBlast) +
+    impact_graph <- ggplot(player_data) +
       coord_cartesian(xlim = c(0, -60), ylim = c(60, 110)) +
       annotate("rect", xmin = Inf, xmax = -Inf, ymin = connection_impact_min, ymax = connection_impact_max, fill = "#00FF00", alpha = 0.25) +
       annotate("rect", xmin = Inf, xmax = -Inf, ymin = red_ranges$connection_impact$ymin, ymax = red_ranges$connection_impact$ymax, fill = "#FF2400", alpha = 0.15) +
       annotate("rect", xmin = Inf, xmax = -Inf, ymin = red_ranges$connection_impact$ymin2, ymax = red_ranges$connection_impact$ymax2, fill = "#FF2400", alpha = 0.15) +
-      geom_point(aes(x = `Vertical Bat Angle (deg)`, y = `Connection at Impact (deg)`, color = `Swing Details`)) +
-      theme_minimal() +
-      theme(legend.title= element_text(color = "white", size = 24),
-            legend.text = element_text(color = "white", size = 20),
-            panel.grid = element_line(color = col_grid),
-            axis.text=element_text(color = "white", size = 12),
-            axis.title = element_text(color = "white", size = 14))
+      geom_point(aes(x = `Vertical Bat Angle (deg)`, y = `Connection at Impact (deg)`, color = `Swing Details`))
   } else {
 
     empty_core_df <- data.frame()
@@ -601,13 +583,7 @@ for (athlete in athletes){
       xlim(0, 10) + 
       ylim(0, 100) +
       annotate("text", x = 5, y = 50, label = "No Blast Data Collected", 
-               size = 8, color = "white", hjust = 0.5, vjust = 0.5) +
-      theme_minimal() +
-      theme(panel.grid = element_line(color = col_grid),
-            axis.title.y = element_blank(),
-            axis.title.x = element_blank(),
-            axis.text = element_blank()
-      )
+               size = 8, color = "white", hjust = 0.5, vjust = 0.5)
     
     contact_graph <- empty_core_df %>% 
       ggplot() + 
@@ -615,13 +591,7 @@ for (athlete in athletes){
       xlim(0, 10) + 
       ylim(0, 100) +
       annotate("text", x = 5, y = 50, label = "No Blast Data Collected", 
-               size = 8, color = "white", hjust = 0.5, vjust = 0.5) +
-      theme_minimal() +
-      theme(panel.grid = element_line(color = col_grid),
-            axis.title.y = element_blank(),
-            axis.title.x = element_blank(),
-            axis.text = element_blank()
-      )
+               size = 8, color = "white", hjust = 0.5, vjust = 0.5)
     
     load_graph <- empty_core_df %>% 
       ggplot() + 
@@ -629,13 +599,7 @@ for (athlete in athletes){
       xlim(0, 10) + 
       ylim(0, 100) +
       annotate("text", x = 5, y = 50, label = "No Blast Data Collected", 
-               size = 8, color = "white", hjust = 0.5, vjust = 0.5) +
-      theme_minimal() +
-      theme(panel.grid = element_line(color = col_grid),
-            axis.title.y = element_blank(),
-            axis.title.x = element_blank(),
-            axis.text = element_blank()
-      )
+               size = 8, color = "white", hjust = 0.5, vjust = 0.5)
     
     impact_graph <- empty_core_df %>% 
       ggplot() + 
@@ -643,19 +607,22 @@ for (athlete in athletes){
       xlim(0, 10) + 
       ylim(0, 100) +
       annotate("text", x = 5, y = 50, label = "No Blast Data Collected", 
-               size = 8, color = "white", hjust = 0.5, vjust = 0.5) +
-      theme_minimal() +
-      theme(panel.grid = element_line(color = col_grid),
-            axis.title.y = element_blank(),
-            axis.title.x = element_blank(),
-            axis.text = element_blank()
-      )
+               size = 8, color = "white", hjust = 0.5, vjust = 0.5)
   }
   
-  plots_row <- ggarrange(power_graph, contact_graph, load_graph, impact_graph, nrow = 1, common.legend = TRUE, legend = "bottom")
-  ggsave(plots_row,file=paste0("Futures Reports Images/",athlete," - swingProfile.png"), width=11,height=3,units="in", dpi = 215)
+  combined_plot <- (power_graph | contact_graph | load_graph | impact_graph) +
+    plot_layout(guides = "collect", nrow = 1) &
+    theme_minimal() +
+    theme(legend.position = 'bottom',
+          legend.title = element_text(color = "white", size = 20),
+          legend.text = element_text(color = "white", size = 18),
+          panel.grid = element_line(color = col_grid),
+          axis.text=element_text(color = "white", size = 12),
+          axis.title = element_text(color = "white", size = 14))
+  
+  ggsave(combined_plot,file=paste0("Futures Reports Images/",athlete," - swingProfile.png"), width=11,height=3.40,units="in", dpi = 215)
   pitchCharts5 <- image_read(paste0("Futures Reports Images/",athlete," - swingProfile.png"))
-  PitchingReport7 <- image_composite(PitchingReport6,pitchCharts5, offset= "+100+2600")
+  PitchingReport7 <- image_composite(PitchingReport6,pitchCharts5, offset= "+100+2550")
   
   attendance_plot_data <- attendanceData %>%
     filter(`Client name` == athlete) %>% 

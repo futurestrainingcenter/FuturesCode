@@ -18,8 +18,8 @@ library(showtext)
 font_add(family = "Good Times", regular = "good times rg.otf")
 showtext_auto()
 
-clientData <- read.csv("/Users/watts/Downloads/FullClientList.csv")
-attendanceData <- read.csv("/Users/watts/Downloads/Learning_Academy_Body_Weight - Sheet1.csv")
+clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv")
+attendanceData <- read_csv("/Users/watts/Downloads/Learning_Academy_Body_Weight - Sheet1.csv")
 proteusData<- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/ProteusPercentiles.csv")
 teambuildrData <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/teambuilderPercentiles.csv")
 CMJdata <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/CMJpercentiles.csv")
@@ -40,7 +40,7 @@ calculate_age <- function(birthdate) {
 }
 
 # Create a new column "Age" that calculates their age
-clientData$Age <- sapply(clientData$`field.general.7.dl_date`, calculate_age)
+clientData$Age <- sapply(clientData$`field-general-7.dl_date`, calculate_age)
 colnames(clientData)[colnames(clientData) == "Client"] <- "Name"
 
 TemplatePageOne <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Strength Report Template.pdf")
@@ -49,6 +49,8 @@ IndexPage <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Physicality Report I
 setwd("/Users/watts/Documents/Futures Performance Center/Test")
 
 athletes <- unique(attendanceData$Athlete)
+
+col_grid <- rgb(235, 235, 235, 50, maxColorValue = 255)
 
 for (athlete in athletes){
   
@@ -74,7 +76,7 @@ for (athlete in athletes){
   } else {
     player_profile <- clientData %>%
       filter(Name == athlete) %>%
-      select(Name, Age, Reporting.Level..Age.Dependent., Position..Baseball.Softball., Height)
+      select(Name, Age, `Reporting Level (Age-Dependent)`, `Position (Baseball/Softball)`, Height)
     names(player_profile) <- c("Name:", "Age:", "Level:", "Position:", "Height:")
   }
   
@@ -122,19 +124,20 @@ for (athlete in athletes){
                hjust = 0, color = "white", size = 9, family = "Good Times")
   }
   
-  attendanceData$Date.Recorded <- as.Date(attendanceData$Date.Recorded, format="%m/%d/%y")
+  attendanceData$`Date Recorded` <- as.Date(attendanceData$`Date Recorded`, format="%m/%d/%y")
   
   weight_plot <- attendanceData %>%
     filter(Athlete == athlete) %>% 
-    ggplot(aes(x = Date.Recorded , y = Weight, color = "")) +
+    ggplot(aes(x = `Date Recorded`, y = Weight, color = "")) +
     geom_line(size = 2) +
     geom_point(size = 4) +
     labs(title = "Weight Trends") +
     theme_minimal() +
     theme(legend.position = "none",
+          panel.grid = element_line(color = col_grid),
           axis.title.y = element_blank(),
           axis.title.x = element_blank(),
-          axis.text=element_text(color = "white", size = 15),
+          axis.text = element_text(color = "white", size = 15),
           plot.title = element_text(hjust = 0.5, color = "white", size = 18, family = "Good Times")
     )
   
@@ -245,6 +248,7 @@ for (athlete in athletes){
       theme(legend.position = "bottom",
             legend.title = element_blank(),
             legend.text = element_text(color = "white", size = 17),
+            panel.grid = element_line(color = col_grid),
             axis.title.y = element_blank(),
             axis.title.x = element_blank(),
             axis.text=element_text(color = "white", size = 15),
@@ -457,9 +461,10 @@ for (athlete in athletes){
     theme(legend.position = "bottom",
           legend.title = element_blank(),
           legend.text = element_text(color = "white", size = 17),
+          panel.grid = element_line(color = col_grid),
           axis.title.y = element_blank(),
           axis.title.x = element_blank(),
-          axis.text=element_text(color = "white", size = 15),
+          axis.text = element_text(color = "white", size = 15),
           plot.title = element_text(hjust = 0.5, color = "white", size = 18, family = "Good Times")
     )    
   
@@ -676,9 +681,10 @@ for (athlete in athletes){
       theme(legend.position = "bottom",
             legend.title = element_blank(),
             legend.text = element_text(color = "white", size = 17),
+            panel.grid = element_line(color = col_grid),
             axis.title.y = element_blank(),
             axis.title.x = element_blank(),
-            axis.text=element_text(color = "white", size = 15),
+            axis.text = element_text(color = "white", size = 15),
             plot.title = element_text(hjust = 0.5, color = "white", size = 18, family = "Good Times"))
     
     # Apply ylim conditionally

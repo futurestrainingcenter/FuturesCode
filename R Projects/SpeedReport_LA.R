@@ -18,8 +18,8 @@ library(showtext)
 font_add(family = "Good Times", regular = "good times rg.otf")
 showtext_auto()
 
-clientData <- read.csv("/Users/watts/Downloads/FullClientList.csv")
-attendanceData <- read.csv("/Users/watts/Downloads/Learning_Academy_Body_Weight - Sheet1.csv")
+clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv")
+attendanceData <- read_csv("/Users/watts/Downloads/Learning_Academy_Body_Weight - Sheet1.csv")
 hardNinety <- read_csv("/Volumes/COLE'S DATA/Data/Speed Report Data/30yard_LearningAcademy.csv")
 accelerationData<- read_csv("/Volumes/COLE'S DATA/Data/Speed Report Data/AccelerationPercentiles.csv")
 maxVeloData <- read_csv("/Volumes/COLE'S DATA/Data/Speed Report Data/MaxVelocityPercentiles.csv")
@@ -41,7 +41,7 @@ calculate_age <- function(birthdate) {
 }
 
 # Create a new column "Age" that calculates their age
-clientData$Age <- sapply(clientData$`field.general.7.dl_date`, calculate_age)
+clientData$Age <- sapply(clientData$`field-general-7.dl_date`, calculate_age)
 colnames(clientData)[colnames(clientData) == "Client"] <- "Name"
 
 TemplatePageOne <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Speed Report Template.pdf")
@@ -77,7 +77,7 @@ for (athlete in athletes){
   } else {
     player_profile <- clientData %>%
       filter(Name == athlete) %>%
-      select(Name, Age, Reporting.Level..Age.Dependent., Position..Baseball.Softball., Height)
+      select(Name, Age, `Reporting Level (Age-Dependent)`, `Position (Baseball/Softball)`, Height)
     names(player_profile) <- c("Name:", "Age:", "Level:", "Position:", "Height:")
   }
   
