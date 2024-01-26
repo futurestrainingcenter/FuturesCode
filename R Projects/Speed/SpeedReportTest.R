@@ -1,0 +1,428 @@
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(magick)
+library(readr)
+library(knitr)
+library(ggpubr)
+library(cowplot)
+library(grid)
+library(gridExtra)
+library(qpdf)
+library(pdftools)
+library(scales)
+library(lubridate)
+library(tidyverse)
+library(showtext)
+
+font_add(family = "Good Times", regular = "good times rg.otf")
+showtext_auto()
+
+clientData <- read.csv("/Users/watts/Downloads/AllClients.csv")
+attendanceData <- read.csv("/Users/watts/Downloads/SpeedAttendanceData.csv")
+hardNinety <- read.csv("/Users/watts/Downloads/Hard90percentiles.csv")
+accelerationData<- read_csv("/Users/watts/Downloads/AccelerationPercentiles.csv")
+maxVeloData <- read_csv("/Users/watts/Downloads/MaxVelocityPercentiles.csv")
+RSIdata <- read_csv("/Users/watts/Downloads/RSIpercentiles.csv")
+
+hardNinety <- hardNinety %>%
+  mutate(FullName = paste(GivenName, FamilyName))
+
+accelerationData <- accelerationData %>%
+  mutate(FullName = paste(GivenName, FamilyName))
+
+maxVeloData <- maxVeloData %>%
+  mutate(FullName = paste(GivenName, FamilyName))
+
+# Function to calculate age
+calculate_age <- function(birthdate) {
+  if (is.na(birthdate)) {
+    return(NA)
+  } else {
+    birthdate <- ymd(birthdate) # Convert to Date using lubridate
+    age <- interval(start = birthdate, end = Sys.Date()) / years(1)
+    return(floor(age)) # Floor the age to get complete years
+  }
+}
+
+# Create a new column "Age" that calculates their age
+clientData$Age <- sapply(clientData$`field.general.7.dl_date`, calculate_age)
+
+TemplatePageOne <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Speed Report Template.pdf")
+
+setwd("/Users/watts/Documents/Futures Performance Center/Test")
+
+########################################################################################################
+#############################################PLAYER PROFILE#############################################
+########################################################################################################
+
+player_profile <- clientData %>%
+  filter(Client == "Aiden Soto") %>%
+  select(Client, Age, Gender, Reporting.Level..Age.Dependent., Position..Baseball.Softball., Height)
+names(player_profile) <- c("Name:", "Age:", "Gender:", "Level:", "Position:", "Height:")
+
+player_profile <- player_profile %>% 
+  mutate(across(c(`Name:`, `Age:`, `Gender:`, `Level:`, `Position:`, `Height:`), as.character)) %>%
+  pivot_longer(cols = c(`Name:`, `Age:`, `Gender:`, `Level:`, `Position:`, `Height:`), names_to = "label", values_to = "value")
+
+# Define the coordinates for the labels and values
+left_labels <- c("Name:", "Age:", "Level:", "Position:")
+right_labels <- c("Gender:", "Height:")
+left_x <- 0.1  # x position for left labels
+right_x <- 0.353 # x position for right labels
+y_positions <- seq(0.9, 0.3, by = -0.1)  # y positions for each label
+
+# Create a blank ggplot object
+p <- ggplot() +
+  expand_limits(x = 0.575) +
+  theme_void() 
+
+# Add left labels and their values
+for (i in 1:length(left_labels)) {
+  p <- p + 
+    annotate("text", x = left_x, y = y_positions[i], label = left_labels[i], 
+             hjust = 0, color = "#3d9be9", size = 8, fontface = "bold", family = "Good Times") +
+    annotate("text", x = left_x + 0.1, y = y_positions[i], label = player_profile$value[player_profile$label == left_labels[i]], 
+             hjust = 0, color = "white", size = 11, family = "Good Times")
+}
+
+# Add right labels and their values
+for (i in 1:length(right_labels)) {
+  p <- p + 
+    annotate("text", x = right_x, y = y_positions[i + 1], label = right_labels[i], 
+             hjust = 0, color = "#3d9be9", size = 8, fontface = "bold", family = "Good Times") +
+    annotate("text", x = right_x + 0.1, y = y_positions[i + 1], label = player_profile$value[player_profile$label == right_labels[i]], 
+             hjust = 0, color = "white", size = 11, family = "Good Times")
+}
+
+ggsave(p,file=paste0("Speed Reports Images/","playerSummary.png"), width=6,height=2.5,units="in", dpi = 175)
+strengthSummarys <- image_read(paste0("Speed Reports Images/","playerSummary.png"))
+PitchingReport0 <- image_composite(TemplatePageOne,strengthSummarys,offset= "+100+550")
+
+########################################################################################################
+#############################################  ATTENDANCE  #############################################
+########################################################################################################
+
+attendance_plot_data <- attendanceData %>%
+  filter(Client.name == "Aiden Soto") %>% 
+  mutate(`Attendance Score` = round((Attended / 26) * 2, digits = 1))
+
+attendance_score <- max(attendance_plot_data$`Attendance Score`, na.rm = TRUE)
+
+get_color <- function(score) {
+  if (score < 0.5) {
+    return("red")
+  } else if (score >= 0.5 & score < 1) {
+    return("orange")
+  } else if (score >= 1 & score < 1.5) {
+    return("green")
+  } else {
+    return("dodgerblue")
+  }
+}
+
+attendance_plot <- attendance_plot_data %>% 
+  ggplot(aes(x = Client.name, y = `Attendance Score`)) +
+  geom_col(aes(fill = get_color(`Attendance Score`))) +
+  geom_col(aes(y = 2), alpha = 0.5, color = "black") +
+  geom_text(aes(y = 1, label = paste(attendance_score)), size = 14, fontface = "bold", color = "white") +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank()) +
+  scale_fill_identity()
+
+ggsave(attendance_plot,file=paste0("Speed Reports Images/","attendancePlot.png"), width=6,height=1,units="in", dpi = 150)
+attendancePlot <- image_read(paste0("Speed Reports Images/","attendancePlot.png"))
+PitchingReport1 <- image_composite(PitchingReport0, attendancePlot, offset= "+200+1325")
+
+
+########################################################################################################
+#############################################   Hard 90   ##############################################
+########################################################################################################
+
+hardNinety$Date <- as.Date(hardNinety$Date, format="%d/%m/%Y")
+
+hardNinety_graph_data <- hardNinety %>% 
+  filter(FullName == "Aiden Soto") %>%
+  group_by(Date) %>%
+  summarize(Cumulative3 = min(Cumulative3, na.rm = TRUE),
+            PercentileRank = max(PercentileRank, na.rm = TRUE)) %>%
+  ungroup()
+
+minHardNinety <- min(hardNinety_graph_data$Cumulative3, na.rm = TRUE)
+
+hardNinety_percentile_graph <- hardNinety_graph_data %>% 
+  ggplot(aes(x = max(PercentileRank), y = "")) +
+  geom_segment(aes(x = 0, xend = 100, y = "", yend = ""), color = "#9b9b9b", linewidth = 1) +
+  geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(x = 50, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(fill = max(PercentileRank)), color = "black", pch = 21, size = 12) +
+  geom_text(aes(label = round(max(PercentileRank))), size = 8, fontface = "bold") +
+  scale_fill_gradient2(low = "#FF0000", mid = "#FFFF00", high = "#00FF00", midpoint = 50, limits = c(0, 100), na.value = "grey") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        panel.background =  element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()) +
+  annotate("text", x = 0, y = 1, label = "90 Feet Sprint: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
+  annotate("text", x = 100, y = 1, label = paste(round(minHardNinety, digits = 1), " S", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
+
+hardNinety_graph <- hardNinety_graph_data %>% 
+  ggplot(aes(x = Date , y = Cumulative3)) +
+  geom_line(color = "#3d9be9", linewidth = 2) +
+  geom_point(color = "#3d9be9", size = 4) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text=element_text(color = "white", size = 15),
+        plot.title = element_text(hjust = 0.5, color = "white", size = 18, family = "Good Times")
+  )
+
+ggsave(hardNinety_graph,file=paste0("Speed Reports Images/","hardNinetyPlot.png"), width=6,height=2.5,units="in", dpi = 150)
+strengthCharts1 <- image_read(paste0("Speed Reports Images/","hardNinetyPlot.png"))
+PitchingReport2 <- image_composite(PitchingReport1, strengthCharts1, offset= "+1425+925")
+
+ggsave(hardNinety_percentile_graph,file=paste0("Speed Reports Images/","hardNinetyPercentiles.png"), width=7,height=2,units="in", dpi = 150)
+strengthCharts2 <- image_read(paste0("Speed Reports Images/","hardNinetyPercentiles.png"))
+PitchingReport3 <- image_composite(PitchingReport2, strengthCharts2, offset= "+1350+1350")
+
+########################################################################################################
+############################################# Acceleration #############################################
+########################################################################################################
+
+accelerationData$Date <- as.Date(accelerationData$Date, format="%d/%m/%Y")
+
+acceleration_graph_data <- accelerationData %>% 
+  filter(FullName == "Aiden Soto") %>%
+  group_by(Date) %>%
+  summarize(Acceleration = max(Acceleration, na.rm = TRUE),
+            PercentileRank = max(PercentileRank, na.rm = TRUE)) %>%
+  ungroup()
+
+maxAcceleration <- max(acceleration_graph_data$Acceleration, na.rm = TRUE)
+
+acceleration_percentile_graph <- acceleration_graph_data %>% 
+  ggplot(aes(x = max(PercentileRank), y = "")) +
+  geom_segment(aes(x = 0, xend = 100, y = "", yend = ""), color = "#9b9b9b", linewidth = 1) +
+  geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(x = 50, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(fill = max(PercentileRank)), color = "black", pch = 21, size = 12) +
+  geom_text(aes(label = round(max(PercentileRank))), size = 8, fontface = "bold") +
+  scale_fill_gradient2(low = "#FF0000", mid = "#FFFF00", high = "#00FF00", midpoint = 50, limits = c(0, 100), na.value = "grey") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        panel.background =  element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()) +
+  annotate("text", x = 0, y = 1, label = "10 Yard Sprint: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
+  annotate("text", x = 100, y = 1, label = paste(round(maxAcceleration, digits = 1), " ft/s2", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
+
+acceleration_graph <- acceleration_graph_data %>% 
+  ggplot(aes(x = Date , y = Acceleration)) +
+  geom_line(color = "#3d9be9", linewidth = 2) +
+  geom_point(color = "#3d9be9", size = 4) +
+  labs(y = "10y Sprint (ft/s2)") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(color = "white", size = 20),
+        axis.text=element_text(color = "white", size = 15),
+        plot.title = element_text(hjust = 0.5, color = "white", size = 18, family = "Good Times")
+  )
+
+ggsave(acceleration_graph,file=paste0("Speed Reports Images/","accelerationPlot.png"), width=6,height=2.5,units="in", dpi = 150)
+strengthCharts3 <- image_read(paste0("Speed Reports Images/","accelerationPlot.png"))
+PitchingReport4 <- image_composite(PitchingReport3, strengthCharts3, offset= "+175+1825")
+
+ggsave(acceleration_percentile_graph,file=paste0("Speed Reports Images/","accelerationPercentiles.png"), width=7,height=2,units="in", dpi = 150)
+strengthCharts4 <- image_read(paste0("Speed Reports Images/","accelerationPercentiles.png"))
+PitchingReport5 <- image_composite(PitchingReport4, strengthCharts4, offset= "+110+2250")
+
+########################################################################################################
+############################################# Max Velocity #############################################
+########################################################################################################
+
+maxVeloData$Date <- as.Date(maxVeloData$Date, format="%d/%m/%Y")
+
+maxVelo_graph_data <- maxVeloData %>% 
+  filter(FullName == "Aiden Soto") %>%
+  group_by(Date) %>%
+  summarize(MPH = max(MPH, na.rm = TRUE),
+            PercentileRank = max(PercentileRank, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+maxMaxVelo <- max(maxVelo_graph_data$MPH, na.rm = TRUE)
+
+maxVelo_percentile_graph <- maxVelo_graph_data %>% 
+  ggplot(aes(x = max(PercentileRank), y = "")) +
+  geom_segment(aes(x = 0, xend = 100, y = "", yend = ""), color = "#9b9b9b", linewidth = 1) +
+  geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(x = 50, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(fill = max(PercentileRank)), color = "black", pch = 21, size = 12) +
+  geom_text(aes(label = round(max(PercentileRank))), size = 8, fontface = "bold") +
+  scale_fill_gradient2(low = "#FF0000", mid = "#FFFF00", high = "#00FF00", midpoint = 50, limits = c(0, 100), na.value = "grey") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        panel.background =  element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()) +
+  annotate("text", x = 0, y = 1, label = "Flying 10y Sprint: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
+  annotate("text", x = 100, y = 1, label = paste(round(maxMaxVelo, digits = 1), " MPH", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
+
+maxVelo_graph <- maxVelo_graph_data %>% 
+  ggplot(aes(x = Date , y = MPH)) +
+  geom_line(color = "#3d9be9", linewidth = 2) +
+  geom_point(color = "#3d9be9", size = 4) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text=element_text(color = "white", size = 15),
+        plot.title = element_text(hjust = 0.5, color = "white", size = 18, family = "Good Times")
+  )
+
+ggsave(maxVelo_graph,file=paste0("Speed Reports Images/","maxVeloPlot.png"), width=6,height=2.5,units="in", dpi = 150)
+strengthCharts5 <- image_read(paste0("Speed Reports Images/","maxVeloPlot.png"))
+PitchingReport6 <- image_composite(PitchingReport5, strengthCharts5, offset= "+1425+1825")
+
+ggsave(maxVelo_percentile_graph,file=paste0("Speed Reports Images/","maxVeloPercentiles.png"), width=7,height=2,units="in", dpi = 150)
+strengthCharts6 <- image_read(paste0("Speed Reports Images/","maxVeloPercentiles.png"))
+PitchingReport7 <- image_composite(PitchingReport6, strengthCharts6, offset= "+1350+2250")
+
+
+########################################################################################################
+##############################################     RSI     #############################################
+########################################################################################################
+
+RSIdata$Date <- as.Date(RSIdata$Date, format="%m/%d/%Y")
+
+RSI_graph_data <- RSIdata %>% 
+  filter(FullName == "Aiden Soto") %>%
+  group_by(Date) %>%
+  summarize(RSI = min(`Mean RSI (Jump Height/Contact Time) [m/s]`, na.rm = TRUE),
+            PercentileRank = max(PercentileRank, na.rm = TRUE)) %>%
+  ungroup()
+
+minRSI <- min(RSI_graph_data$RSI, na.rm = TRUE)
+
+RSI_percentile_graph <- RSI_graph_data %>% 
+  ggplot(aes(x = max(PercentileRank), y = "")) +
+  geom_segment(aes(x = 0, xend = 100, y = "", yend = ""), color = "#9b9b9b", linewidth = 1) +
+  geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(x = 50, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
+  geom_point(aes(fill = max(PercentileRank)), color = "black", pch = 21, size = 12) +
+  geom_text(aes(label = round(max(PercentileRank))), size = 8, fontface = "bold") +
+  scale_fill_gradient2(low = "#FF0000", mid = "#FFFF00", high = "#00FF00", midpoint = 50, limits = c(0, 100), na.value = "grey") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        panel.background =  element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank()) +
+  annotate("text", x = 0, y = 1, label = "Repeat Hop Test - RSI: ", hjust = 0, vjust = -3.5, color = "white", size = 12, family = "Good Times") +
+  annotate("text", x = 0, y = 1, label = "(Jump Height / Ground Contact Time)", hjust = 0, vjust = -4.5, color = "white", size = 6, family = "Good Times") +
+  annotate("text", x = 100, y = 1, label = paste(round(minRSI, digits = 1), " M/S", sep = ""), hjust = 1, vjust = -3.5, color = "white", size = 12, family = "Good Times")
+
+RSI_graph <- RSI_graph_data %>% 
+  ggplot(aes(x = Date , y = RSI)) +
+  geom_line(color = "#3d9be9", linewidth = 2) +
+  geom_point(color = "#3d9be9", size = 4) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text=element_text(color = "white", size = 15),
+        plot.title = element_text(hjust = 0.5, color = "white", size = 18, family = "Good Times")
+  )
+
+ggsave(RSI_graph,file=paste0("Speed Reports Images/","RSIplot.png"), width=6,height=2.5,units="in", dpi = 150)
+strengthCharts7 <- image_read(paste0("Speed Reports Images/","RSIplot.png"))
+PitchingReport8 <- image_composite(PitchingReport7, strengthCharts7, offset= "+1425+2750")
+
+ggsave(RSI_percentile_graph,file=paste0("Speed Reports Images/","RSIpercentiles.png"), width=7,height=3,units="in", dpi = 150)
+strengthCharts8 <- image_read(paste0("Speed Reports Images/","RSIpercentiles.png"))
+PitchingReport9 <- image_composite(PitchingReport8, strengthCharts8, offset= "+110+2750")
+
+
+########################################################################################################
+############################################  Speed Score  #############################################
+########################################################################################################
+
+hardNinety_percentile_score <- max(hardNinety_graph_data$PercentileRank, na.rm = TRUE)
+acceleration_percentile_score <- max(acceleration_graph_data$PercentileRank, na.rm = TRUE)
+maxVelo_percentile_score <- max(maxVelo_graph_data$PercentileRank, na.rm = TRUE)
+RSI_percentile_score <- max(RSI_graph_data$PercentileRank, na.rm = TRUE)
+
+scores <- c(hardNinety_percentile_score, acceleration_percentile_score, maxVelo_percentile_score, RSI_percentile_score)
+
+speedScore <- round(mean(scores, na.rm = TRUE), digits = 1)
+
+get_color_two <- function(score) {
+  if (score < 50) {
+    return("red")
+  } else if (score >= 50 & score < 70) {
+    return("orange")
+  } else if (score >= 70 & score < 90) {
+    return("green")
+  } else {
+    return("dodgerblue")
+  }
+}
+
+speedScore_plot <- attendance_plot_data %>% 
+  ggplot(aes(x = Client.name, y = speedScore)) +
+  geom_col(aes(fill = get_color_two(speedScore))) +
+  geom_col(aes(y = 100), alpha = 0.5, color = "black") +
+  geom_text(aes(y = 50, label = paste(speedScore)), size = 14, fontface = "bold", color = "white") +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_blank()) +
+  scale_fill_identity()
+
+ggsave(speedScore_plot,file=paste0("Speed Reports Images/","speedScore.png"), width=6,height=1,units="in", dpi = 150)
+speedScorePlot <- image_read(paste0("Speed Reports Images/","speedScore.png"))
+PitchingReport10 <- image_composite(PitchingReport9, speedScorePlot, offset= "+1425+475")
+
+image_write(PitchingReport10,path = "page1.pdf",format="pdf",quality=100,density=300)
+image_write(PitchingReport10,path = paste0("Speed Reports/", "SpeedReportTest.pdf"),format="pdf")
