@@ -1,29 +1,20 @@
-library(dplyr)
-library(readr)
+# Set the path to the main folder containing year, month, and day folders
+main_folder <- "/Users/watts/Documents/Futures Performance Center/Data/practice"
 
-# Set the working directory to where your CSV files are located
-# You can change the path to the directory where your CSV files are stored
-setwd("/Users/watts/Documents/Futures Performance Center/Data/Trackman Data")
+# Create an empty data frame to store the combined data
+combined_data <- data.frame()
 
-# List all CSV files in the directory
-file_list <- list.files(pattern = "\\.csv$")
+# List all CSV files in the directory and its subdirectories
+csv_files <- list.files(path = main_folder, pattern = "\\.csv$", recursive = TRUE, full.names = TRUE)
 
-# Function to read and combine all CSV files
-aggregate_csvs <- function(file_list) {
-  # Read the first file to create the initial dataframe
-  combined_df <- read_csv(file_list[1])
-  
-  # Loop through the remaining files and bind them row-wise
-  for (file in file_list[-1]) {
-    temp_df <- read_csv(file)
-    combined_df <- bind_rows(combined_df, temp_df)
-  }
-  
-  return(combined_df)
+# Loop through each CSV file and append its contents to the combined data frame
+for (file in csv_files) {
+  data <- read.csv(file, header = TRUE)  # Assuming CSV files have headers
+  combined_data <- rbind(combined_data, data)
 }
 
-# Use the function to combine all CSV files
-combined_data <- aggregate_csvs(file_list)
+# Write the combined data frame to a new CSV file
+write.csv(combined_data, "combined_data.csv", row.names = FALSE)
 
-# You can now work with the combined_data dataframe, or you can write it to a new CSV file
-write_csv(combined_data, "MasterTrackmanData.csv")
+# Print a message to confirm the process is completed
+cat("All CSV files have been combined into 'combined_data.csv'.\n")

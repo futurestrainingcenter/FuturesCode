@@ -21,12 +21,12 @@ showtext_auto()
 clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv")
 attendanceData <- read_csv("/Users/watts/Downloads/StrengthAttendance_data.csv")
 proteusData<- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/ProteusPercentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 teambuildrData <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/teambuilderPercentiles.csv")
 CMJdata <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/CMJpercentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 ISOSQTdata <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/ISO_SquatPercentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 
 # ISOSQTdata$Date <- as.Date(ISOSQTdata$Date, format="%m/%d/%Y")
 # CMJdata$Date <- as.Date(CMJdata$Date, format="%m/%d/%Y")
@@ -57,31 +57,6 @@ IndexPage <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Physicality Report I
 
 setwd("/Users/watts/Documents/Futures Performance Center/Test")
 
-exercises <- c('Barbell Back Squat', 'Trap Bar Deadlift', 'Barbell Bench Press', 
-               'Straight Arm Trunk Rotation Max Isometric Test - Crane Scale', 'Cable Lat Pull Down')
-
-merged_data$'Max Value' <- as.numeric(as.character(merged_data$'Max Value'))
-merged_data$'Max Value' <- round(merged_data$'Max Value')
-
-filteredExercise_data <- merged_data %>%
-  filter(`Exercise Name` %in% exercises)
-
-for (exercise in exercises) {
-  
-  exercise_data <- filteredExercise_data %>% filter(`Exercise Name` == exercise)
-  
-  Q1 <- quantile(exercise_data$`Max Value`, 0.25, na.rm = TRUE)
-  Q3 <- quantile(exercise_data$`Max Value`, 0.75, na.rm = TRUE)
-  IQR <- Q3 - Q1
-  
-  lower_bound <- Q1 - 1.5 * IQR
-  upper_bound <- Q3 + 1.5 * IQR
-  
-  # Filter out the outliers
-  filteredExercise_data <- filteredExercise_data %>%
-    filter(!(`Exercise Name` == exercise & (`Max Value` < lower_bound | `Max Value` > upper_bound)))
-} 
-
 athletes <- unique(attendanceData$`Client name`)
 
 col_grid <- rgb(235, 235, 235, 50, maxColorValue = 255)
@@ -90,7 +65,7 @@ low_attendance_athletes <- c()
 
 for (athlete in athletes){
   
-  finalExercise_data <- filteredExercise_data %>% 
+  finalExercise_data <- teambuildrData %>% 
     filter(Name == athlete)
   
   ########################################################################################################
@@ -234,8 +209,8 @@ for (athlete in athletes){
   weight_plot <- CMJdata %>%
     filter(Name == athlete) %>% 
     ggplot(aes(x = Date, y = `Weight (lbs)`)) +
-    geom_line(linewidth = 2, color = "#3d9be9") +
-    geom_point(size = 4, color = "#3d9be9") +
+    geom_line(linewidth = 2, color = "#FF0000") +
+    geom_point(size = 4, color = "#FF0000") +
     labs(title = "Weight Trends") +
     theme_minimal() +
     theme(legend.position = "none",
@@ -255,11 +230,13 @@ for (athlete in athletes){
   ########################################################################################################
   #############################################     CORE     #############################################
   ########################################################################################################
+  filtered_proteusData <- proteusData %>% 
+    filter(Name == athlete)
   
-  if(any(proteusData$Name == athlete)) {
+  if (any(filtered_proteusData$`exercise name` == "Straight Arm Trunk Rotation")) {
     
-    core_graph_data <- proteusData %>% 
-      filter(Name == athlete & `exercise name` == "Straight Arm Trunk Rotation") %>%
+    core_graph_data <- filtered_proteusData %>% 
+      filter(`exercise name` == "Straight Arm Trunk Rotation") %>%
       group_by(`session createdAt`, Level, Gender) %>%
       summarize(`power - mean` = round(max(`power - mean`, na.rm = TRUE)),
                 PowerPercentileRank = max(PowerPercentileRank, na.rm = TRUE),
@@ -303,7 +280,7 @@ for (athlete in athletes){
     
     maxAcc <- max(core_graph_data$`acceleration - mean`, na.rm = TRUE)
     
-    transformation_factor = maxPower / maxAcc
+    transformation_factor = round(maxPower / maxAcc, digits = 3)
     
     corePower_graph <- core_graph_data %>%
       ggplot(aes(x = `session createdAt`)) +
@@ -311,10 +288,10 @@ for (athlete in athletes){
       geom_point(aes(y = `power - mean`, color = "Straight Arm Trunk Rotation (Strength)"), size = 4) +
       geom_line(aes(y = `acceleration - mean` * transformation_factor, color = "Straight Arm Trunk Rotation (Speed)"), linewidth = 2) +
       geom_point(aes(y = `acceleration - mean` * transformation_factor, color = "Straight Arm Trunk Rotation (Speed)"), size = 4) +
-      labs(y = "Strength (W)") +
+      labs(y = "Strength (W)\n") +
       scale_y_continuous(
         limits = c(core_ylim_min, core_ylim_max),
-        sec.axis = sec_axis(~ . / transformation_factor, name = "Speed (m/s²)")
+        sec.axis = sec_axis(~ . / transformation_factor, name = "Speed (m/s²)\n")
       ) +
       theme_minimal() +
       theme(
@@ -324,13 +301,13 @@ for (athlete in athletes){
         panel.grid = element_line(color = col_grid),
         axis.title.x = element_blank(),
         axis.title.y.left = element_text(color = "#3d9be9", size = 20),
-        axis.title.y.right = element_text(color = "#f75838", size = 20),
-        axis.text.y.left = element_text(color = "#3d9be9", size = 15),
-        axis.text.y.right = element_text(color = "#f75838", size = 15),
+        axis.title.y.right = element_text(color = "#FF0000", size = 20),
+        axis.text.y.left = element_text(color = "white", size = 15),
+        axis.text.y.right = element_text(color = "white", size = 15),
         axis.text.x = element_text(color = "white", size = 15)
       ) +
       scale_color_manual(values = c("Straight Arm Trunk Rotation (Strength)" = "#3d9be9", 
-                                    "Straight Arm Trunk Rotation (Speed)" = "#f75838"),
+                                    "Straight Arm Trunk Rotation (Speed)" = "#FF0000"),
                          breaks = c("Straight Arm Trunk Rotation (Strength)", 
                                     "Straight Arm Trunk Rotation (Speed)"))
     
@@ -355,7 +332,7 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "#f75838", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "#FF0000", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(maxAcc, digits = 1), " m/s²", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
     core_power_percentile_score <- max(core_graph_data$PowerPercentileRank, na.rm = TRUE)
@@ -577,13 +554,13 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = vjust_value, color = "#f75838", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = vjust_value, color = "#FF0000", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(maxCMJ, digits = 1), " N", sep = ""), hjust = 1, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
       asymmetry_annotations
     
     legs_acc_percentile_score <- max(CMJ_graph_data$PercentileRank, na.rm = TRUE)
     
-    transformation_factor_three <- maxISOSQT / maxCMJ
+    transformation_factor_three <- round(maxISOSQT / maxCMJ, digits = 3)
     
     combined_legs_plot <- ISOSQT_graph_data %>%
       ggplot(aes(x = Date)) +
@@ -591,10 +568,10 @@ for (athlete in athletes){
       geom_point(aes(y = `Peak Vertical Force [N]`, color = "Isometric Belt Squat (Strength)"), size = 4) +
       geom_line(data = CMJ_graph_data, aes(y = `Concentric Peak Force [N]` * transformation_factor_three, color = "CMJ (Speed)"), linewidth = 2) +
       geom_point(data = CMJ_graph_data, aes(y = `Concentric Peak Force [N]` * transformation_factor_three, color = "CMJ (Speed)"), size = 4) +
-      labs(y = "Strength (N)") +
+      labs(y = "Strength (N)\n") +
       scale_y_continuous(
         limits = c(legs_ylim_min, legs_ylim_max),
-        sec.axis = sec_axis(~ . / transformation_factor_three, name = "Speed (N)")
+        sec.axis = sec_axis(~ . / transformation_factor_three, name = "Speed (N)\n")
       ) +
       theme_minimal() +
       theme(
@@ -604,13 +581,13 @@ for (athlete in athletes){
         panel.grid = element_line(color = col_grid),
         axis.title.x = element_blank(),
         axis.title.y.left = element_text(color = "#3d9be9", size = 20),
-        axis.title.y.right = element_text(color = "#f75838", size = 20),
-        axis.text.y.left = element_text(color = "#3d9be9", size = 15),
-        axis.text.y.right = element_text(color = "#f75838", size = 15),
+        axis.title.y.right = element_text(color = "#FF0000", size = 20),
+        axis.text.y.left = element_text(color = "white", size = 15),
+        axis.text.y.right = element_text(color = "white", size = 15),
         axis.text.x = element_text(color = "white", size = 15)
       ) +
       scale_color_manual(values = c("Isometric Belt Squat (Strength)" = "#3d9be9", 
-                                    "CMJ (Speed)" = "#f75838"),
+                                    "CMJ (Speed)" = "#FF0000"),
                          breaks = c("Isometric Belt Squat (Strength)", 
                                     "CMJ (Speed)"))
     
@@ -922,10 +899,10 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "#f75838", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "#FF0000", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(max_acc_pushpull, digits = 1), "m/s²"), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
-    transformation_factor_two = max_power_pushpull / max_acc_pushpull
+    transformation_factor_two = round(max_power_pushpull / max_acc_pushpull, digits = 3)
     
     pushpull_power_graph <- pushpull_graph_data %>%
       filter(`exercise name` == "PushPull") %>% 
@@ -934,10 +911,10 @@ for (athlete in athletes){
       geom_point(aes(y = `power - mean`, color = "Push/Pull (Strength)"), size = 4) +
       geom_line(aes(y = `acceleration - mean` * transformation_factor_two, color = "Push/Pull (Speed)"), linewidth = 2) +
       geom_point(aes(y = `acceleration - mean` * transformation_factor_two, color = "Push/Pull (Speed)"), size = 4) +
-      labs(y = "Strength (W)") +
+      labs(y = "Strength (W)\n") +
       scale_y_continuous(
         limits = c(arms_ylim_min, arms_ylim_max),
-        sec.axis = sec_axis(~ . / transformation_factor_two, name = "Speed (m/s²)")
+        sec.axis = sec_axis(~ . / transformation_factor_two, name = "Speed (m/s²)\n")
       ) +
       theme_minimal() +
       theme(
@@ -948,13 +925,13 @@ for (athlete in athletes){
         panel.grid = element_line(color = col_grid),
         axis.title.x = element_blank(),
         axis.title.y.left = element_text(color = "#3d9be9", size = 20),
-        axis.title.y.right = element_text(color = "#f75838", size = 20),
-        axis.text.y.left = element_text(color = "#3d9be9", size = 15),
-        axis.text.y.right = element_text(color = "#f75838", size = 15),
+        axis.title.y.right = element_text(color = "#FF0000", size = 20),
+        axis.text.y.left = element_text(color = "white", size = 15),
+        axis.text.y.right = element_text(color = "white", size = 15),
         axis.text.x = element_text(color = "white", size = 15)
       ) +
       scale_color_manual(values = c("Push/Pull (Strength)" = "#3d9be9", 
-                                    "Push/Pull (Speed)" = "#f75838"),
+                                    "Push/Pull (Speed)" = "#FF0000"),
                          breaks = c("Push/Pull (Strength)", 
                                     "Push/Pull (Speed)"))
     
@@ -1118,7 +1095,7 @@ for (athlete in athletes){
     }
   }
   
-  if (any(scores == 0, na.rm = TRUE)) {
+  if (any(scores == 0 | is.infinite(scores) & scores < 0, na.rm = TRUE)) {
     strengthScore_plot <- ggplot(data.frame(ClientName = "N/A", y = 50), aes(x = ClientName, y = y)) +
       geom_col(aes(y = 100), alpha = 0, color = "black") +
       geom_text(aes(label = "One or more scores are zero.\nPlease bring report to Futures Coaches to test."), size = 8, color = "white") +

@@ -207,7 +207,7 @@ teambuildrData <- read_csv("/Users/watts/Downloads/Teambuildr Raw Data Report.cs
 merged_data <- left_join(teambuildrData, clientData, by = "Name")
 
 exercises <- c('Barbell Back Squat', 'Trap Bar Deadlift', 'Barbell Bench Press', 
-               'Straight Arm Trunk Rotation Max Isometric Test - Crane Scale', 'Cable Lat Pull Down (1)')
+               'Straight Arm Trunk Rotation Max Isometric Test - Crane Scale', 'Cable Lat Pull Down')
 
 merged_data$'Max Value' <- as.numeric(as.character(merged_data$'Max Value'))
 merged_data$'Max Value' <- round(merged_data$'Max Value')

@@ -18,15 +18,16 @@ library(showtext)
 font_add(family = "Good Times", regular = "good times rg.otf")
 showtext_auto()
 
-clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv")
+clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv") %>% 
+  rename(Name = Client)
 attendanceData <- read_csv("/Users/watts/Downloads/Learning_Academy_Body_Weight.csv")
 proteusData<- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/ProteusPercentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 teambuildrData <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/teambuilderPercentiles.csv")
 CMJdata <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/CMJpercentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 ISOSQTdata <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/ISO_SquatPercentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 
 attendanceData$DateRecorded <- as.Date(attendanceData$DateRecorded, format="%m/%d/%y")
 # ISOSQTdata$Date <- as.Date(ISOSQTdata$Date, format="%m/%d/%Y")
@@ -41,7 +42,7 @@ calculate_age <- function(birthdate) {
   if (is.na(birthdate)) {
     return(NA)
   } else {
-    birthdate <- ymd(birthdate) # Convert to Date using lubridate
+    birthdate <- mdy(birthdate) # Convert to Date using lubridate
     age <- interval(start = birthdate, end = Sys.Date()) / years(1)
     return(floor(age)) # Floor the age to get complete years
   }
@@ -49,7 +50,6 @@ calculate_age <- function(birthdate) {
 
 # Create a new column "Age" that calculates their age
 clientData$Age <- sapply(clientData$`field-general-7.dl_date`, calculate_age)
-colnames(clientData)[colnames(clientData) == "Client"] <- "Name"
 
 merged_data <- left_join(teambuildrData, clientData, by="Name")
 
@@ -57,31 +57,6 @@ TemplatePageOne <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Strength Repor
 IndexPage <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Physicality Report Index.pdf")
 
 setwd("/Users/watts/Documents/Futures Performance Center/Test")
-
-exercises <- c('Barbell Back Squat', 'Trap Bar Deadlift', 'Barbell Bench Press', 
-               'Straight Arm Trunk Rotation Max Isometric Test - Crane Scale', 'Cable Lat Pull Down')
-
-merged_data$'Max Value' <- as.numeric(as.character(merged_data$'Max Value'))
-merged_data$'Max Value' <- round(merged_data$'Max Value')
-
-filteredExercise_data <- merged_data %>%
-  filter(`Exercise Name` %in% exercises)
-
-for (exercise in exercises) {
-  
-  exercise_data <- filteredExercise_data %>% filter(`Exercise Name` == exercise)
-  
-  Q1 <- quantile(exercise_data$`Max Value`, 0.25, na.rm = TRUE)
-  Q3 <- quantile(exercise_data$`Max Value`, 0.75, na.rm = TRUE)
-  IQR <- Q3 - Q1
-  
-  lower_bound <- Q1 - 1.5 * IQR
-  upper_bound <- Q3 + 1.5 * IQR
-  
-  # Filter out the outliers
-  filteredExercise_data <- filteredExercise_data %>%
-    filter(!(`Exercise Name` == exercise & (`Max Value` < lower_bound | `Max Value` > upper_bound)))
-} 
 
 athletes <- unique(attendanceData$Athlete)
 
@@ -91,7 +66,7 @@ low_attendance_athletes <- c()
 
 for (athlete in athletes){
   
-  finalExercise_data <- filteredExercise_data %>% 
+  finalExercise_data <- teambuildrData %>% 
     filter(Name == athlete)
   
   ########################################################################################################
@@ -99,9 +74,11 @@ for (athlete in athletes){
   ########################################################################################################
   
   attendance_plot_data <- attendanceData %>%
-    filter(Athlete == athlete) %>%
-    summarize(Attendance_Count = n()) %>%
-    mutate(`Attendance Score` = round((Attendance_Count / 26) * 3, digits = 1))
+    filter(Athlete == athlete) %>% 
+    summarise(Attendance_Count = n()) %>% 
+    mutate(`Total Weeks` = 8, # Adjust this number based on the exact number of weeks in the 2-month period
+           `Total Days Open` = `Total Weeks` * 6, # Assuming the facility is open 6 days a week
+           `Attendance Score` = round(Attendance_Count / `Total Weeks`, digits = 1))
   
   attendance_score <- max(attendance_plot_data$`Attendance Score`, na.rm = TRUE)
   
@@ -116,11 +93,11 @@ for (athlete in athletes){
   }
   
   get_color <- function(score) {
-    if (score < 1.5) {
+    if (score < 1) {
       return("red")
-    } else if (score >= 1.5 & score < 2) {
+    } else if (score >= 1 & score < 2) {
       return("#FFA500")
-    } else if (score >= 2 & score < 2.5) {
+    } else if (score >= 2 & score < 3) {
       return("green")
     } else {
       return("#3d9be9")
@@ -130,8 +107,8 @@ for (athlete in athletes){
   attendance_plot <- attendance_plot_data %>% 
     ggplot(aes(x = "", y = `Attendance Score`)) +
     geom_col(aes(fill = get_color(`Attendance Score`))) +
-    geom_col(aes(y = 3), alpha = 0.5, color = "black") +
-    geom_text(aes(y = 1.5, label = paste(attendance_score)), size = 14, fontface = "bold", color = "white") +
+    geom_col(aes(y = 4), alpha = 0.5, color = "black") +
+    geom_text(aes(y = 2, label = paste(attendance_score)), size = 14, fontface = "bold", color = "white") +
     coord_flip() +
     theme_minimal() +
     theme(
@@ -235,8 +212,8 @@ for (athlete in athletes){
   weight_plot <- attendanceData %>%
     filter(Athlete == athlete) %>% 
     ggplot(aes(x = DateRecorded, y = Weight)) +
-    geom_line(linewidth = 2, color = "#3d9be9") +
-    geom_point(size = 4, color = "#3d9be9") +
+    geom_line(linewidth = 2, color = "#FF0000") +
+    geom_point(size = 4, color = "#FF0000") +
     labs(title = "Weight Trends") +
     theme_minimal() +
     theme(legend.position = "none",
@@ -299,12 +276,12 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = -2.5, color = "#3d9be9", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(maxPower, digits = 1), " W", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
     maxAcc <- max(core_graph_data$`acceleration - mean`, na.rm = TRUE)
     
-    transformation_factor = maxPower / maxAcc
+    transformation_factor = round(maxPower / maxAcc, digits = 3)
     
     corePower_graph <- core_graph_data %>%
       ggplot(aes(x = `session createdAt`)) +
@@ -325,13 +302,13 @@ for (athlete in athletes){
         panel.grid = element_line(color = col_grid),
         axis.title.x = element_blank(),
         axis.title.y.left = element_text(color = "#3d9be9", size = 20),
-        axis.title.y.right = element_text(color = "#e93d45", size = 20),
+        axis.title.y.right = element_text(color = "#FF0000", size = 20),
         axis.text.y.left = element_text(color = "#3d9be9", size = 15),
-        axis.text.y.right = element_text(color = "#e93d45", size = 15),
+        axis.text.y.right = element_text(color = "#FF0000", size = 15),
         axis.text.x = element_text(color = "white", size = 15)
       ) +
       scale_color_manual(values = c("Straight Arm Trunk Rotation (Strength)" = "#3d9be9", 
-                                    "Straight Arm Trunk Rotation (Speed)" = "#e93d45"),
+                                    "Straight Arm Trunk Rotation (Speed)" = "#FF0000"),
                          breaks = c("Straight Arm Trunk Rotation (Strength)", 
                                     "Straight Arm Trunk Rotation (Speed)"))
     
@@ -356,7 +333,7 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "#FF0000", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(maxAcc, digits = 1), " m/s²", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
     core_power_percentile_score <- max(core_graph_data$PowerPercentileRank, na.rm = TRUE)
@@ -530,7 +507,7 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = vjust_value, color = "#3d9be9", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(maxISOSQT, digits = 1), " N", sep = ""), hjust = 1, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
       asymmetry_annotations
     
@@ -578,13 +555,13 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = vjust_value, color = "#FF0000", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(maxCMJ, digits = 1), " N", sep = ""), hjust = 1, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
       asymmetry_annotations
     
     legs_acc_percentile_score <- max(CMJ_graph_data$PercentileRank, na.rm = TRUE)
     
-    transformation_factor_three <- maxISOSQT / maxCMJ
+    transformation_factor_three <- round(maxISOSQT / maxCMJ, digits = 3)
     
     combined_legs_plot <- ISOSQT_graph_data %>%
       ggplot(aes(x = Date)) +
@@ -605,13 +582,13 @@ for (athlete in athletes){
         panel.grid = element_line(color = col_grid),
         axis.title.x = element_blank(),
         axis.title.y.left = element_text(color = "#3d9be9", size = 20),
-        axis.title.y.right = element_text(color = "#e93d45", size = 20),
+        axis.title.y.right = element_text(color = "#FF0000", size = 20),
         axis.text.y.left = element_text(color = "#3d9be9", size = 15),
-        axis.text.y.right = element_text(color = "#e93d45", size = 15),
+        axis.text.y.right = element_text(color = "#FF0000", size = 15),
         axis.text.x = element_text(color = "white", size = 15)
       ) +
       scale_color_manual(values = c("Isometric Belt Squat (Strength)" = "#3d9be9", 
-                                    "CMJ (Speed)" = "#e93d45"),
+                                    "CMJ (Speed)" = "#FF0000"),
                          breaks = c("Isometric Belt Squat (Strength)", 
                                     "CMJ (Speed)"))
     
@@ -688,7 +665,7 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = vjust_value, color = "#3d9be9", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(maxISOSQT, digits = 1), " N", sep = ""), hjust = 1, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
       asymmetry_annotations
     
@@ -782,7 +759,7 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = vjust_value, color = "#FF0000", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(maxCMJ, digits = 1), " N", sep = ""), hjust = 1, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
       asymmetry_annotations
     
@@ -897,7 +874,7 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = -2.5, color = "#3d9be9", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(max_power_pushpull, digits = 1), "W"), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
     max_acc_pushpull <- max(pushpull_graph_data$`acceleration - mean`[pushpull_graph_data$`exercise name` == "PushPull"], na.rm = TRUE)
@@ -923,10 +900,10 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "white", size = 12, family = "Good Times") +
+      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "#FF0000", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(max_acc_pushpull, digits = 1), "m/s²"), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
-    transformation_factor_two = max_power_pushpull / max_acc_pushpull
+    transformation_factor_two = round(max_power_pushpull / max_acc_pushpull, digits = 3)
     
     pushpull_power_graph <- pushpull_graph_data %>%
       filter(`exercise name` == "PushPull") %>% 
@@ -949,13 +926,13 @@ for (athlete in athletes){
         panel.grid = element_line(color = col_grid),
         axis.title.x = element_blank(),
         axis.title.y.left = element_text(color = "#3d9be9", size = 20),
-        axis.title.y.right = element_text(color = "#e93d45", size = 20),
+        axis.title.y.right = element_text(color = "#FF0000", size = 20),
         axis.text.y.left = element_text(color = "#3d9be9", size = 15),
-        axis.text.y.right = element_text(color = "#e93d45", size = 15),
+        axis.text.y.right = element_text(color = "#FF0000", size = 15),
         axis.text.x = element_text(color = "white", size = 15)
       ) +
       scale_color_manual(values = c("Push/Pull (Strength)" = "#3d9be9", 
-                                    "Push/Pull (Speed)" = "#e93d45"),
+                                    "Push/Pull (Speed)" = "#FF0000"),
                          breaks = c("Push/Pull (Strength)", 
                                     "Push/Pull (Speed)"))
     
@@ -1119,7 +1096,7 @@ for (athlete in athletes){
     }
   }
   
-  if (any(scores == 0, na.rm = TRUE)) {
+  if (any(scores == 0 | is.infinite(scores) & scores < 0, na.rm = TRUE)) {
     strengthScore_plot <- ggplot(data.frame(ClientName = "N/A", y = 50), aes(x = ClientName, y = y)) +
       geom_col(aes(y = 100), alpha = 0, color = "black") +
       geom_text(aes(label = "One or more scores are zero.\nPlease bring report to Futures Coaches to test."), size = 8, color = "white") +

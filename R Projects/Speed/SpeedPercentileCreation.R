@@ -12,7 +12,7 @@ clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv") %>%
 ###############################################################################################################################################
 ###############################################################################################################################################
 
-hardNinety <- read.csv("/Users/watts/Downloads/FuturesSprint_10_30_40.csv")
+hardNinety <- read.csv("/Users/watts/Downloads/FuturesSprint.csv")
 hardNinety$Date <- as.Date(hardNinety$Date, format="%d/%m/%Y")
 
 hardNinety <- hardNinety %>%
@@ -67,15 +67,7 @@ write_csv(filtered_data, "/Volumes/COLE'S DATA/Data/Speed Report Data/Hard90perc
 ###############################################################################################################################################
 ###############################################################################################################################################
 
-futuresSprint <- read_csv("/Users/watts/Downloads/FuturesSprint_10_30_40.csv")
-futuresSprint$Date <- as.Date(futuresSprint$Date, format="%d/%m/%Y")
-
-futuresSprint <- futuresSprint %>%
-  mutate(FullName = paste(GivenName, FamilyName),
-         Month = month(Date, label = TRUE, abbr = FALSE)) %>% 
-  select(Date, Month, Name, FullName, Split1)
-
-accelerationData <- read_csv("/Users/watts/Downloads/10ydSprint_data.csv")
+accelerationData <- read_csv("/Users/watts/Downloads/FuturesSprint.csv")
 accelerationData$Date <- as.Date(accelerationData$Date, format="%d/%m/%Y")
 
 accelerationData <- accelerationData %>%
@@ -83,19 +75,17 @@ accelerationData <- accelerationData %>%
          Month = month(Date, label = TRUE, abbr = FALSE)) %>% 
   select(Date, Month, Name, FullName, Split1)
 
-combined_acceleration <- bind_rows(accelerationData, futuresSprint)
-
-combined_acceleration <- left_join(combined_acceleration, clientData, by = "FullName")
+accelerationData <- left_join(accelerationData, clientData, by = "FullName")
 
 # Filtering and calculation of percentiles by Level
-Q1 <- quantile(combined_acceleration$Split1, 0.25, na.rm = TRUE)
-Q3 <- quantile(combined_acceleration$Split1, 0.75, na.rm = TRUE)
+Q1 <- quantile(accelerationData$Split1, 0.25, na.rm = TRUE)
+Q3 <- quantile(accelerationData$Split1, 0.75, na.rm = TRUE)
 IQR <- Q3 - Q1
 
 lower_bound <- Q1 - 1.5 * IQR
 upper_bound <- Q3 + 1.5 * IQR
 
-filtered_data <- combined_acceleration %>%
+filtered_data <- accelerationData %>%
   filter(Split1 >= lower_bound & Split1 <= upper_bound)
 
 filtered_data["Level"][is.na(filtered_data["Level"])] <- "Unknown"
@@ -129,40 +119,29 @@ write_csv(filtered_data, "/Volumes/COLE'S DATA/Data/Speed Report Data/Accelerati
 ###############################################################################################################################################
 
 
-futuresSprint <- read.csv("/Users/watts/Downloads/FuturesSprint_10_30_40.csv")
-futuresSprint$Date <- as.Date(futuresSprint$Date, format="%d/%m/%Y")
+maxVeloData <- read.csv("/Users/watts/Downloads/FuturesSprint.csv")
+maxVeloData$Date <- as.Date(maxVeloData$Date, format="%d/%m/%Y")
 
-futuresSprint <- futuresSprint %>%
+maxVeloData <- maxVeloData %>%
   mutate(FullName = paste(GivenName, FamilyName),
          `10 yard fly` = Cumulative3 - Cumulative2,
          Month = month(Date, label = TRUE, abbr = FALSE)) %>% 
   select(Date, Month, Name, FullName, `10 yard fly`)
 
-maxVeloData <- read_csv("/Users/watts/Downloads/Flying10ydSprint_data.csv")
-maxVeloData$Date <- as.Date(maxVeloData$Date, format="%d/%m/%Y")
-
-maxVeloData <- maxVeloData %>%
-  rename(`10 yard fly` = Split1) %>% 
-  mutate(FullName = paste(GivenName, FamilyName),
-         Month = month(Date, label = TRUE, abbr = FALSE)) %>% 
-  select(Date, Month, Name, FullName, `10 yard fly`)
-
-combined_maxVelo <- bind_rows(maxVeloData, futuresSprint)
-
-combined_maxVelo <- combined_maxVelo %>% 
+maxVeloData <- maxVeloData %>% 
   mutate(MPH = round((10 / 1760) * (3600 / `10 yard fly`), digits = 3))
 
-combined_maxVelo <- left_join(combined_maxVelo, clientData, by = "FullName")
+maxVeloData <- left_join(maxVeloData, clientData, by = "FullName")
 
 # Filtering and calculation of percentiles by Level
-Q1 <- quantile(combined_maxVelo$MPH, 0.25, na.rm = TRUE)
-Q3 <- quantile(combined_maxVelo$MPH, 0.75, na.rm = TRUE)
+Q1 <- quantile(maxVeloData$MPH, 0.25, na.rm = TRUE)
+Q3 <- quantile(maxVeloData$MPH, 0.75, na.rm = TRUE)
 IQR <- Q3 - Q1
 
 lower_bound <- Q1 - 1.5 * IQR
 upper_bound <- Q3 + 1.5 * IQR
 
-filtered_data <- combined_maxVelo %>%
+filtered_data <- maxVeloData %>%
   filter(MPH >= lower_bound & MPH <= upper_bound)
 
 filtered_data["Level"][is.na(filtered_data["Level"])] <- "Unknown"
@@ -199,7 +178,7 @@ RSIdata$Date <- as.Date(RSIdata$Date, format="%m/%d/%Y")
 RSIdata <- RSIdata %>% 
   rename(FullName = Name, Name = `Test Type`) %>% 
   mutate(Month = month(Date, label = TRUE, abbr = FALSE)) %>% 
-  select(Date, Month, FullName, Name, `Mean RSI (Jump Height/Contact Time) [m/s]`, `Jump Height (Flight Time) [cm]`, `Contact Time [ms]`)
+  select(Date, Month, FullName, Name, `BW [KG]`, `Mean RSI (Jump Height/Contact Time) [m/s]`, `Jump Height (Flight Time) [cm]`, `Contact Time [ms]`)
 
 RSIdata <- left_join(RSIdata, clientData, by = "FullName")
 

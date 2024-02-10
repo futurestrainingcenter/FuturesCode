@@ -2,7 +2,7 @@
 library(dplyr)
 
 # Set the working directory to the folder containing your CSV files
-setwd("/Users/watts/Downloads/Full Team Report - 2023-11-28 - 2023-11-28 - 1704312455") # replace with your folder path
+setwd("/Users/watts/Downloads/Full Team Report - 2023-12-29 - 2023-12-29 - 1706645653") # replace with your folder path
 
 # Get a list of all CSV files in the directory
 file_list <- list.files(pattern = "\\.csv$")
@@ -33,5 +33,5 @@ for (file_name in file_list) {
 master_df <- bind_rows(all_data)
 
 # Save the combined data to a new CSV file
-write.csv(master_df, "/Users/watts/Downloads/master_data.csv", row.names = FALSE)
+write.csv(master_df, "/Users/watts/Downloads/MasterBlastData.csv", row.names = FALSE)
 

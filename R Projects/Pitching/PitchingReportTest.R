@@ -58,9 +58,9 @@ colnames(clientData)[colnames(clientData) == "Client"] <- "Name"
 pitchers <- unique(trackmanData$Pitcher)
 
 TemplatePageOne <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Pitching Report Test.pdf")
-IndexPage <- image_read_pdf("/Users/watts/Downloads/Pitching Report Metric Index.pdf")
+IndexPage <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Pitching Report Metric Index.pdf")
 
-USABaseball <- c("ChangeUp"="#007FFF", "Curveball"="#00FF00", "Cutter"="#FFFF00", "Fastball"="#FF0000", "Sinker"="#FFA500", "Slider"="#800080", "Splitter"="#FF69B4")
+USABaseball <- c("ChangeUp"="#3d9be9", "Curveball"="#00FF00", "Cutter"="#FFFF00", "Fastball"="#FF0000", "Sinker"="#FFA500", "Slider"="#800080", "Splitter"="#FF69B4")
 
 setwd("/Users/watts/Documents/Futures Performance Center/Test")
 
@@ -69,7 +69,7 @@ col_grid <- rgb(235, 235, 235, 25, maxColorValue = 255)
 for (pitcher in pitchers){
   
   filteredTrackmanData <- trackmanData %>% 
-    filter(Pitcher == pitcher, is.na(Flag))
+    filter(Pitcher == pitcher & (sum(!is.na(Flag)) > 0 | is.na(Flag)))
   
   if (nrow(filteredTrackmanData) == 0) {
     print(paste("No trackman data for:", pitcher))
@@ -173,7 +173,7 @@ for (pitcher in pitchers){
     geom_point(aes(y = ER, color = "ER"), size = 4) + 
     geom_hline(yintercept = 20, linetype="dashed", color="green") +
     labs(y = "% BW", x = NULL) +
-    scale_color_manual(values = c("IR" = "#e93d45", "ER" = "#3d9be9")) +
+    scale_color_manual(values = c("IR" = "#FF0000", "ER" = "#3d9be9")) +
     theme_minimal() +
     theme(legend.position = "bottom",
           legend.title= element_blank(),
@@ -191,7 +191,7 @@ for (pitcher in pitchers){
     geom_point(aes(y = Grip, color = "Grip"), size = 4) +
     geom_hline(yintercept = 15, linetype="dashed", color="green") +
     labs(y = "% BW", x = NULL) +
-    scale_color_manual(values = c("Scaption" = "#e93d45", "Grip" = "#3d9be9")) +
+    scale_color_manual(values = c("Scaption" = "#FF0000", "Grip" = "#3d9be9")) +
     theme_minimal() +
     theme(legend.position = "bottom",
           legend.title= element_blank(),

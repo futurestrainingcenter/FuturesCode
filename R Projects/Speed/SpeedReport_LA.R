@@ -18,18 +18,19 @@ library(showtext)
 font_add(family = "Good Times", regular = "good times rg.otf")
 showtext_auto()
 
-clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv")
+clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv") %>% 
+  rename(Name = Client)
 attendanceData <- read_csv("/Users/watts/Downloads/Learning_Academy_Body_Weight.csv")
 hardNinety <- read_csv("/Volumes/COLE'S DATA/Data/Speed Report Data/Hard90percentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 accelerationData<- read_csv("/Volumes/COLE'S DATA/Data/Speed Report Data/AccelerationPercentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 maxVeloData <- read_csv("/Volumes/COLE'S DATA/Data/Speed Report Data/MaxVelocityPercentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 RSIdata <- read_csv("/Volumes/COLE'S DATA/Data/Speed Report Data/RSIpercentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 CMJdata <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/CMJpercentiles.csv") %>% 
-  filter(Month %in% c("November", "December"))
+  filter(Month %in% c("December", "January"))
 
 hardNinety$Date <- as.Date(hardNinety$Date, format="%Y-%m-%d")
 # accelerationData$Date <- as.Date(accelerationData$Date, format="%d/%m/%Y")
@@ -44,7 +45,7 @@ calculate_age <- function(birthdate) {
   if (is.na(birthdate)) {
     return(NA)
   } else {
-    birthdate <- ymd(birthdate) # Convert to Date using lubridate
+    birthdate <- mdy(birthdate) # Convert to Date using lubridate
     age <- interval(start = birthdate, end = Sys.Date()) / years(1)
     return(floor(age)) # Floor the age to get complete years
   }
@@ -52,7 +53,6 @@ calculate_age <- function(birthdate) {
 
 # Create a new column "Age" that calculates their age
 clientData$Age <- sapply(clientData$`field-general-7.dl_date`, calculate_age)
-colnames(clientData)[colnames(clientData) == "Client"] <- "Name"
 
 TemplatePageOne <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Speed Report Template.pdf")
 IndexPage <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Speed Report Index.pdf")
@@ -72,9 +72,10 @@ for (athlete in athletes){
   ########################################################################################################
   
   attendance_plot_data <- attendanceData %>%
-    filter(Athlete == athlete) %>%
-    summarize(Attendance_Count = n()) %>%
-    mutate(`Attendance Score` = round((Attendance_Count / 26) * 2, digits = 1))
+    filter(`Client name` == athlete) %>% 
+    mutate(`Total Weeks` = 8, # Adjust this number based on the exact number of weeks in the 2-month period
+           `Total Days Open` = `Total Weeks` * 6, # Assuming the facility is open 6 days a week
+           `Attendance Score` = round(Attended / `Total Weeks`, digits = 1))
   
   attendance_score <- max(attendance_plot_data$`Attendance Score`, na.rm = TRUE)
   
@@ -91,9 +92,9 @@ for (athlete in athletes){
   get_color <- function(score) {
     if (score < 1) {
       return("#FF0000")
-    } else if (score >= 1 & score < 1.33) {
+    } else if (score >= 1 & score < 2) {
       return("#FFA500")
-    } else if (score >= 1.33 & score < 1.66) {
+    } else if (score >= 2 & score < 3) {
       return("green")
     } else {
       return("#3d9be9")
@@ -103,8 +104,8 @@ for (athlete in athletes){
   attendance_plot <- attendance_plot_data %>% 
     ggplot(aes(x = "", y = `Attendance Score`)) +
     geom_col(aes(fill = get_color(`Attendance Score`))) +
-    geom_col(aes(y = 2), alpha = 0.5, color = "black") +
-    geom_text(aes(y = 1, label = paste(attendance_score)), size = 14, fontface = "bold", color = "white") +
+    geom_col(aes(y = 4), alpha = 0.5, color = "black") +
+    geom_text(aes(y = 2, label = paste(attendance_score)), size = 14, fontface = "bold", color = "white") +
     coord_flip() +
     theme_minimal() +
     theme(
@@ -250,8 +251,8 @@ for (athlete in athletes){
     
     hardNinety_graph <- hardNinety_graph_data %>% 
       ggplot(aes(x = Date, y = Cumulative2)) +
-      geom_line(linewidth = 2, color = "#e93d45") +
-      geom_point(size = 4, color = "#e93d45") +
+      geom_line(linewidth = 2, color = "#FF0000") +
+      geom_point(size = 4, color = "#FF0000") +
       scale_y_reverse() +
       ylim(hardNinety_ylim_max, hardNinety_ylim_min) +
       labs(y = "Seconds", caption = "*Y-axis inverted for visual purposes") +
@@ -371,8 +372,8 @@ for (athlete in athletes){
     
     acceleration_graph <- acceleration_graph_data %>% 
       ggplot(aes(x = Date , y = Split1)) +
-      geom_line(linewidth = 2, color = "#e93d45") +
-      geom_point(size = 4, color = "#e93d45") +
+      geom_line(linewidth = 2, color = "#FF0000") +
+      geom_point(size = 4, color = "#FF0000") +
       scale_y_reverse() +
       ylim(acceleration_ylim_max, acceleration_ylim_min) +
       labs(y = "Seconds", caption = "*Y-axis inverted for visual purposes") +
@@ -492,8 +493,8 @@ for (athlete in athletes){
     
     maxVelo_graph <- maxVelo_graph_data %>% 
       ggplot(aes(x = Date , y = MPH)) +
-      geom_line(linewidth = 2, color = "#e93d45") +
-      geom_point(size = 4, color = "#e93d45") +
+      geom_line(linewidth = 2, color = "#FF0000") +
+      geom_point(size = 4, color = "#FF0000") +
       ylim(maxVelo_ylim_min, maxVelo_ylim_max) +
       labs(y = "MPH") +
       theme_minimal() +
@@ -612,8 +613,8 @@ for (athlete in athletes){
     
     RSI_graph <- RSI_graph_data %>% 
       ggplot(aes(x = Date , y = RSI)) +
-      geom_line(linewidth = 2, color = "#e93d45") +
-      geom_point(size = 4, color = "#e93d45") +
+      geom_line(linewidth = 2, color = "#FF0000") +
+      geom_point(size = 4, color = "#FF0000") +
       ylim(RSI_ylim_min, RSI_ylim_max) +
       labs(y = "Meters per second") +
       theme_minimal() +
@@ -702,7 +703,7 @@ for (athlete in athletes){
     }
   }
   
-  if (any(scores == 0, na.rm = TRUE)) {
+  if (any(scores == 0 | is.infinite(scores) & scores < 0, na.rm = TRUE)) {
     speedScore_plot <- ggplot(data.frame(Name = "N/A", y = 50), aes(x = Name, y = y)) +
       geom_col(aes(y = 100), alpha = 0, color = "black") +
       geom_text(aes(label = "One or more scores are zero.\nPlease bring report to Futures Coaches to test."), size = 8, color = "white") +
