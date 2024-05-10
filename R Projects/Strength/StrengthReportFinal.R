@@ -20,41 +20,60 @@ showtext_auto()
 
 clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv") %>% 
   rename(Name = Client)
-attendanceData <- read_csv("/Users/watts/Downloads/StrengthAttendance_data.csv")
-LA_attendanceData<- read_csv("/Users/watts/Downloads/Learning_Academy_Body_Weight.csv") %>% 
-  rename(Name = Athlete, Date = DateRecorded)
-proteusData<- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/ProteusPercentiles.csv") %>% 
-  filter(Month %in% c("December", "January"))
-teambuildrData <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/teambuilderPercentiles.csv")
-CMJdata <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/CMJpercentiles.csv") %>% 
-  filter(Month %in% c("December", "January"))
-ISOSQTdata <- read_csv("/Volumes/COLE'S DATA/Data/Physicality Report Data/ISO_SquatPercentiles.csv") %>% 
-  filter(Month %in% c("December", "January"))
+proteusData<- read_csv("/Users/watts/Documents/Futures Performance Center/Data/Strength Percentiles/ProteusPercentiles.csv") %>% 
+  filter(Month %in% c("March", "April"))
+teambuildrData <- read_csv("/Users/watts/Documents/Futures Performance Center/Data/Strength Percentiles/teambuilderPercentiles.csv")
+SJdata <- read_csv("/Users/watts/Documents/Futures Performance Center/Data/Strength Percentiles/SQTJumpPercentiles.csv") %>% 
+  filter(Month %in% c("March", "April"))
+ISOSQTdata <- read_csv("/Users/watts/Documents/Futures Performance Center/Data/Strength Percentiles/ISO_BeltSquatPercentiles.csv") %>% 
+  filter(Month %in% c("March", "April"))
 
-LA_attendanceData$Date <- as.Date(LA_attendanceData$Date, format="%m/%d/%y")
-# ISOSQTdata$Date <- as.Date(ISOSQTdata$Date, format="%Y/%m/%d")
-# CMJdata$Date <- as.Date(CMJdata$Date, format="%Y/%m/%d")
-# proteusData$`session createdAt` <- as.Date(proteusData$`session createdAt`, format="%Y/%m/%d")
+LA_attendanceData <- read_csv("/Users/watts/Downloads/Learning_Academy_Body_Weight.csv") %>% 
+  mutate(Date = as.Date(Date, format="%m/%d/%y"),
+         Month = month(Date, label = TRUE, abbr = FALSE))
+
+attendanceData <- read_csv("/Users/watts/Downloads/CheckIns.csv") %>%
+  rename(Name = Client) %>% 
+  mutate(Date = as.Date(Date, format = "%b %d, %Y"),
+         Month = month(Date, label = TRUE, abbr = FALSE),
+         LearningBlock = case_when(
+           `Service Name` == "Learning Academy - Block 1" ~ "Learning Academy - Attended",
+           `Service Name` == "Learning Academy - Block 2" ~ "Learning Academy - Attended",
+           TRUE ~ `Service Name`
+         )) %>%
+  filter(`Service Name` %in% c("Level 2 - Strength", "Level 3 - Strength", "Strength Base L3", "Strength Base L2", "Strength Pro L3", 
+                               "Strength Pro L2", "Collegiate/Pro - Strength Training w/ Coach", "Professional - Facility Access", "Learning Academy - Attended")) %>% 
+  distinct(Name, Date, LearningBlock, .keep_all = TRUE)
+
+summary_attendanceData <- attendanceData %>%
+  filter(Month %in% c("March", "April")) %>%
+  group_by(Name) %>%
+  summarise(Attendance = n(), 
+            .groups = 'drop')
+
+#ISOSQTdata$Date <- as.Date(ISOSQTdata$Date, format="%Y-%m-%d")
+SJdata$Date <- as.Date(SJdata$Date, format="%y-%m-%d")
+#proteusData$`session createdAt` <- as.Date(proteusData$`session createdAt`, format="%m/%d/%y")
 
 # Extract names from clientData
 clientNames <- clientData$Name
 
-# Compare and extract non-matching names
-nonMatchingVALD <- setdiff(CMJdata$Name, clientNames)
-nonMatchingProteus <- setdiff(proteusData$Name, clientNames)
-nonMatchingTeambuildr <- setdiff(teambuildrData$Name, clientNames)
+# # Compare and extract non-matching names
+# nonMatchingVALD <- setdiff(SJdata$Name, clientNames)
+# nonMatchingProteus <- setdiff(proteusData$Name, clientNames)
+# nonMatchingTeambuildr <- setdiff(teambuildrData$Name, clientNames)
+# 
+# # Combine non-matching names into one data frame
+# nonMatching <- rbind(
+#   data.frame(Name = nonMatchingVALD, Source = 'VALD'),
+#   data.frame(Name = nonMatchingProteus, Source = 'Proteus'),
+#   data.frame(Name = nonMatchingTeambuildr, Source = 'Teambuildr')
+# )
+# 
+# # Write the non-matching names to a new CSV file
+# write_csv(nonMatching, "/Users/watts/Downloads/missing_strength_data.csv")
 
-# Combine non-matching names into one data frame
-nonMatching <- rbind(
-  data.frame(Name = nonMatchingVALD, Source = 'VALD'),
-  data.frame(Name = nonMatchingProteus, Source = 'Proteus'),
-  data.frame(Name = nonMatchingTeambuildr, Source = 'Teambuildr')
-)
-
-# Write the non-matching names to a new CSV file
-write_csv(nonMatching, "/Users/watts/Downloads/missing_strength_data.csv")
-
-CMJdata <- CMJdata %>%
+SJdata <- SJdata %>%
   mutate(Weight = round(`BW [KG]` * 2.20462, digits = 1))
 
 # Function to calculate age
@@ -62,7 +81,7 @@ calculate_age <- function(birthdate) {
   if (is.na(birthdate)) {
     return(NA)
   } else {
-    birthdate <- mdy(birthdate) # Convert to Date using lubridate
+    birthdate <- ymd(birthdate) # Convert to Date using lubridate
     age <- interval(start = birthdate, end = Sys.Date()) / years(1)
     return(floor(age)) # Floor the age to get complete years
   }
@@ -92,12 +111,11 @@ for (athlete in athletes){
   ########################################################################################################
   #############################################  ATTENDANCE  #############################################
   ########################################################################################################
-  
-  attendance_plot_data <- attendanceData %>%
-    filter(`Client name` == athlete) %>% 
+
+  attendance_plot_data <- summary_attendanceData %>%
+    filter(Name == athlete) %>% 
     mutate(`Total Weeks` = 8, # Adjust this number based on the exact number of weeks in the 2-month period
-           `Total Days Open` = `Total Weeks` * 6, # Assuming the facility is open 6 days a week
-           `Attendance Score` = round(Attended / `Total Weeks`, digits = 1))
+           `Attendance Score` = round(Attendance / `Total Weeks`, digits = 1))
   
   attendance_score <- max(attendance_plot_data$`Attendance Score`, na.rm = TRUE)
   
@@ -115,11 +133,11 @@ for (athlete in athletes){
     sapply(scores, function(score) {
       if (is.na(score)) {
         return(NA)
-      } else if (score < 1.25) {
+      } else if (score < 1) {
         return("#FF0000")
-      } else if (score >= 1.25 & score < 2) {
+      } else if (score >= 1 & score < 1.75) {
         return("#FFA500")
-      } else if (score >= 2 & score < 3) {
+      } else if (score >= 1.75 & score < 2.5) {
         return("green")
       } else {
         return("#3d9be9")
@@ -127,8 +145,7 @@ for (athlete in athletes){
     })
   }
   
-  attendance_plot <- attendance_plot_data %>% 
-    ggplot(aes(x = `Client name`, y = `Attendance Score`)) +
+  attendance_plot <- ggplot(attendance_plot_data, aes(x = Name, y = `Attendance Score`)) +
     geom_col(aes(fill = get_color(`Attendance Score`))) +
     geom_col(aes(y = 3), alpha = 0.5, color = "black") +
     geom_text(aes(y = 1.5, label = paste(attendance_score)), size = 14, fontface = "bold", color = "white") +
@@ -145,7 +162,7 @@ for (athlete in athletes){
   
   ggsave(attendance_plot,file=paste0("Futures Reports Images/", athlete,"_attendancePlot.png"), width=6,height=1,units="in", dpi = 150)
   attendancePlot <- image_read(paste0("Futures Reports Images/", athlete,"_attendancePlot.png"))
-  PitchingReport0 <- image_composite(TemplatePageOne, attendancePlot, offset= "+200+1665")
+  PitchingReport0 <- image_composite(TemplatePageOne, attendancePlot, offset= "+225+1700")
   
   #######################################################################################################
   ############################################PLAYER PROFILE#############################################
@@ -169,7 +186,7 @@ for (athlete in athletes){
   }
   
   if (!any(LA_attendanceData$Name == athlete)) {
-    if (!any(CMJdata$Name == athlete)) {
+    if (!any(SJdata$Name == athlete)) {
       player_profile_two <- data.frame(
         Weight = NA,
         stringsAsFactors = FALSE
@@ -178,7 +195,7 @@ for (athlete in athletes){
       
       combined_profile <- cbind(player_profile, player_profile_two)
     } else {
-      player_profile_two <- CMJdata %>%
+      player_profile_two <- SJdata %>%
         filter(Name == athlete) %>%
         select(Weight) %>%
         slice(n())
@@ -230,7 +247,7 @@ for (athlete in athletes){
     p <- p + 
       annotate("text", x = right_x, y = y_positions[i + 1], label = right_labels[i], 
                hjust = 0, color = "#3d9be9", size = 8, family = "Good Times") +
-      annotate("text", x = right_x + 0.1, y = y_positions[i + 1], label = combined_profile$value[combined_profile$label == right_labels[i]], 
+      annotate("text", x = right_x + 0.09, y = y_positions[i + 1], label = combined_profile$value[combined_profile$label == right_labels[i]], 
                hjust = 0, color = "white", size = 11, family = "Good Times")
   }
   
@@ -238,7 +255,7 @@ for (athlete in athletes){
   if (any(LA_attendanceData$Name == athlete)) {
     data_to_use <- LA_attendanceData
   } else {
-    data_to_use <- CMJdata
+    data_to_use <- SJdata
   }
   
   first_weight_value <- data_to_use %>%
@@ -247,8 +264,8 @@ for (athlete in athletes){
     .$Weight %>%
     first()
   
-  y_min_weight <- first_weight_value - 8
-  y_max_weight <- first_weight_value + 8
+  y_min_weight <- round(first_weight_value - 8)
+  y_max_weight <- round(first_weight_value + 8)
   
   weight_plot <- data_to_use %>%
     filter(Name == athlete) %>% 
@@ -266,9 +283,9 @@ for (athlete in athletes){
     scale_y_continuous(limits = c(y_min_weight, y_max_weight))
   
   full_player_profile <- ggarrange(p, weight_plot, nrow = 2)
-  ggsave(full_player_profile,file=paste0("Futures Reports Images/", athlete,"_playerSummary.png"), width=6,height=5,units="in", dpi = 175)
+  ggsave(full_player_profile,file=paste0("Futures Reports Images/", athlete,"_playerSummary.png"), width=6.15,height=5.5,units="in", dpi = 175)
   strengthSummarys <- image_read(paste0("Futures Reports Images/", athlete,"_playerSummary.png"))
-  PitchingReport1 <- image_composite(PitchingReport0,strengthSummarys,offset= "+100+525")
+  PitchingReport1 <- image_composite(PitchingReport0,strengthSummarys,offset= "+125+525")
   
   
   ########################################################################################################
@@ -282,9 +299,9 @@ for (athlete in athletes){
     core_graph_data <- filtered_proteusData %>% 
       filter(`exercise name` == "Straight Arm Trunk Rotation") %>%
       group_by(`session createdAt`, Level, Gender) %>%
-      summarize(`power - mean` = round(max(`power - mean`, na.rm = TRUE)),
+      summarize(`power - high` = round(max(`power - high`, na.rm = TRUE)),
                 PowerPercentileRank = max(PowerPercentileRank, na.rm = TRUE),
-                `acceleration - mean` = round(max(`acceleration - mean`, na.rm = TRUE)),
+                `acceleration - high` = round(max(`acceleration - high`, na.rm = TRUE)),
                 AccelerationPercentileRank = max(AccelerationPercentileRank, na.rm = TRUE),
                 .groups = "drop")
     
@@ -294,10 +311,10 @@ for (athlete in athletes){
     core_ylim_data <- proteusData %>% 
       filter(Level == core_level, Gender == core_gender)
     
-    core_ylim_min <- round(min(core_ylim_data$`power - mean`[core_ylim_data$`exercise name` == "Straight Arm Trunk Rotation"], na.rm = TRUE))
-    core_ylim_max <- round(max(core_ylim_data$`power - mean`[core_ylim_data$`exercise name` == "Straight Arm Trunk Rotation"], na.rm = TRUE))
+    core_ylim_min <- round(min(core_ylim_data$`power - high`[core_ylim_data$`exercise name` == "Straight Arm Trunk Rotation"], na.rm = TRUE))
+    core_ylim_max <- round(max(core_ylim_data$`power - high`[core_ylim_data$`exercise name` == "Straight Arm Trunk Rotation"], na.rm = TRUE))
     
-    maxPower <- max(core_graph_data$`power - mean`, na.rm = TRUE)
+    maxPower <- max(core_graph_data$`power - high`, na.rm = TRUE)
     
     core_power_percentile_graph <- core_graph_data %>% 
       ggplot(aes(x = max(PowerPercentileRank), y = "")) +
@@ -322,16 +339,16 @@ for (athlete in athletes){
       annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = -2.5, color = "#3d9be9", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(maxPower, digits = 1), " W", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
-    maxAcc <- max(core_graph_data$`acceleration - mean`, na.rm = TRUE)
+    maxAcc <- max(core_graph_data$`acceleration - high`, na.rm = TRUE)
     
     transformation_factor = round(maxPower / maxAcc, digits = 3)
     
     corePower_graph <- core_graph_data %>%
       ggplot(aes(x = `session createdAt`)) +
-      geom_line(aes(y = `power - mean`, color = "Straight Arm Trunk Rotation (Strength)"), linewidth = 2) +
-      geom_point(aes(y = `power - mean`, color = "Straight Arm Trunk Rotation (Strength)"), size = 4) +
-      geom_line(aes(y = `acceleration - mean` * transformation_factor, color = "Straight Arm Trunk Rotation (Speed)"), linewidth = 2) +
-      geom_point(aes(y = `acceleration - mean` * transformation_factor, color = "Straight Arm Trunk Rotation (Speed)"), size = 4) +
+      geom_line(aes(y = `power - high`, color = "Straight Arm Trunk Rotation (Strength)"), linewidth = 2) +
+      geom_point(aes(y = `power - high`, color = "Straight Arm Trunk Rotation (Strength)"), size = 4) +
+      geom_line(aes(y = `acceleration - high` * transformation_factor, color = "Straight Arm Trunk Rotation (Speed)"), linewidth = 2) +
+      geom_point(aes(y = `acceleration - high` * transformation_factor, color = "Straight Arm Trunk Rotation (Speed)"), size = 4) +
       labs(y = "Strength (W)\n") +
       scale_y_continuous(
         limits = c(core_ylim_min, core_ylim_max),
@@ -363,7 +380,6 @@ for (athlete in athletes){
       geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
       geom_point(aes(fill = max(AccelerationPercentileRank)), color = "black", pch = 21, size = 12) +
       geom_text(aes(label = round(max(AccelerationPercentileRank))), size = 8, fontface = "bold") +
-      labs(title = paste("Speed Max: ", round(maxAcc, digits = 1), " m/s2", sep = "")) +
       scale_fill_gradient2(low = "#FF0000", mid = "#FFFF00", high = "#00FF00", midpoint = 50, limits = c(0, 100), na.value = "grey") +
       theme_minimal() +
       theme(legend.position = "none",
@@ -382,17 +398,17 @@ for (athlete in athletes){
     core_power_percentile_score <- max(core_graph_data$PowerPercentileRank, na.rm = TRUE)
     core_acc_percentile_score <- max(core_graph_data$AccelerationPercentileRank, na.rm = TRUE)
     
-    ggsave(corePower_graph,file=paste0("Futures Reports Images/", athlete,"_coreStrengthPlot.png"), width=7,height=3,units="in", dpi = 150)
+    ggsave(corePower_graph,file=paste0("Futures Reports Images/", athlete,"_coreStrengthPlot.png"), width=7.5,height=3.5,units="in", dpi = 150)
     strengthCharts1 <- image_read(paste0("Futures Reports Images/", athlete,"_coreStrengthPlot.png"))
-    PitchingReport2 <- image_composite(PitchingReport1, strengthCharts1, offset= "+1360+900")
+    PitchingReport2 <- image_composite(PitchingReport1, strengthCharts1, offset= "+1320+800")
     
-    ggsave(core_power_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_coreStrengthPercentiles.png"), width=7,height=2,units="in", dpi = 150)
+    ggsave(core_power_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_coreStrengthPercentiles.png"), width=7,height=3,units="in", dpi = 150)
     strengthCharts2 <- image_read(paste0("Futures Reports Images/", athlete,"_coreStrengthPercentiles.png"))
-    PitchingReport3 <- image_composite(PitchingReport2, strengthCharts2, offset= "+1350+1375")
+    PitchingReport3 <- image_composite(PitchingReport2, strengthCharts2, offset= "+1350+1300")
     
-    ggsave(core_acc_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_coreSpeedPercentiles.png"), width=7,height=2,units="in", dpi = 150)
+    ggsave(core_acc_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_coreSpeedPercentiles.png"), width=7,height=3,units="in", dpi = 150)
     strengthCharts3 <- image_read(paste0("Futures Reports Images/", athlete,"_coreSpeedPercentiles.png"))
-    PitchingReport4 <- image_composite(PitchingReport3, strengthCharts3, offset= "+1350+1575")
+    PitchingReport4 <- image_composite(PitchingReport3, strengthCharts3, offset= "+1350+1535")
   } else {
     
     empty_core_df <- data.frame()
@@ -403,18 +419,7 @@ for (athlete in athletes){
       geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
       geom_point(aes(x = 50, y = ""), color = "#9b9b9b", size = 5) +
       geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
-      theme_minimal() +
-      theme(legend.position = "none",
-            panel.background =  element_blank(),
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank(),
-            axis.ticks.y = element_blank(),
-            axis.text.y = element_blank(),
-            axis.title.y = element_blank(),
-            axis.ticks.x = element_blank(),
-            axis.text.x = element_blank(),
-            axis.title.x = element_blank()
-      )
+      theme_void()
     
     empty_core_plot <- empty_core_df %>% 
       ggplot() + 
@@ -422,13 +427,12 @@ for (athlete in athletes){
       xlim(0, 10) + 
       ylim(0, 100) +
       annotate("text", x = 5, y = 50, label = "No data collected.\nPlease bring report to Futures Coaches to test.", 
-               size = 8, color = "white", hjust = 0.5, vjust = 0.5) +
+               size = 10, color = "white", hjust = 0.5, vjust = 0.5) +
       theme_minimal() +
       theme(panel.grid = element_line(color = col_grid),
-            axis.title.y = element_blank(),
-            axis.title.x = element_blank(),
-            axis.text=element_text(color = "white", size = 15)
-      )
+            axis.title = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank())
     
     core_power_percentile_score <- 0
     core_acc_percentile_score <- 0
@@ -439,18 +443,18 @@ for (athlete in athletes){
     
     ggsave(empty_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_coreStrengthPercentiles.png"), width=6,height=1,units="in", dpi = 150)
     strengthCharts2 <- image_read(paste0("Futures Reports Images/", athlete,"_coreStrengthPercentiles.png"))
-    PitchingReport3 <- image_composite(PitchingReport2, strengthCharts2, offset= "+1425+1450")
+    PitchingReport3 <- image_composite(PitchingReport2, strengthCharts2, offset= "+1425+1425")
     
     ggsave(empty_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_coreSpeedPercentiles.png"), width=6,height=1,units="in", dpi = 150)
     strengthCharts3 <- image_read(paste0("Futures Reports Images/", athlete,"_coreSpeedPercentiles.png"))
-    PitchingReport4 <- image_composite(PitchingReport3, strengthCharts3, offset= "+1425+1650")
+    PitchingReport4 <- image_composite(PitchingReport3, strengthCharts3, offset= "+1425+1635")
   }
   ########################################################################################################
   #############################################     LEGS     #############################################
   ########################################################################################################
   
   athlete_in_ISOSQTdata <- any(ISOSQTdata$Name == athlete)
-  athlete_in_CMJdata <- any(CMJdata$Name == athlete)
+  athlete_in_SJdata <- any(SJdata$Name == athlete)
   
   # Functions to generate empty plots
   generate_empty_percentile_graph <- function() {
@@ -461,18 +465,8 @@ for (athlete in athletes){
       geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
       geom_point(aes(x = 50, y = ""), color = "#9b9b9b", size = 5) +
       geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
-      theme_minimal() +
-      theme(legend.position = "none",
-            panel.background =  element_blank(),
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank(),
-            axis.ticks.y = element_blank(),
-            axis.text.y = element_blank(),
-            axis.title.y = element_blank(),
-            axis.ticks.x = element_blank(),
-            axis.text.x = element_blank(),
-            axis.title.x = element_blank()
-      )
+      theme_void()
+     
     return(empty_legs_percentile_graph)
   }
   
@@ -484,22 +478,22 @@ for (athlete in athletes){
       xlim(0, 10) + 
       ylim(0, 100) +
       annotate("text", x = 5, y = 50, label = "No data collected.\nPlease bring report to Futures Coaches to test.", 
-               size = 8, color = "white", hjust = 0.5, vjust = 0.5) +
+               size = 10, color = "white", hjust = 0.5, vjust = 0.5) +
       theme_minimal() +
       theme(panel.grid = element_line(color = col_grid),
-            axis.title.y = element_blank(),
-            axis.title.x = element_blank(),
-            axis.text=element_text(color = "white", size = 15)
-      )
+            axis.title = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank())
+    
     return(empty_legs_plot)
   }
   
   # New if statement to check if both datasets contain the athlete
-  if (athlete_in_ISOSQTdata && athlete_in_CMJdata) {
+  if (athlete_in_ISOSQTdata && athlete_in_SJdata) {
     
     ISOSQT_graph_data <- ISOSQTdata %>% 
       filter(Name == athlete) %>%
-      select(Date, Level, Gender, Name, `Peak Vertical Force [N]`, `Peak Vertical Force % (Asym) (%)`, PercentileRank)
+      select(Date, Level, Gender, Name, `Peak Vertical Force [N]`, PercentileRank)
     
     ISOSQT_max_data <- ISOSQT_graph_data %>% 
       slice_max(order_by = `Peak Vertical Force [N]`, n = 1, with_ties = FALSE)
@@ -514,21 +508,6 @@ for (athlete in athletes){
     legs_ylim_max <- round(max(legs_ylim_data$`Peak Vertical Force [N]`, na.rm = TRUE))
     
     maxISOSQT <- max(ISOSQT_graph_data$`Peak Vertical Force [N]`, na.rm = TRUE)
-    
-    # Processing the asymmetry data
-    ISOSQT_max_data$AsymmetryValue <- as.numeric(gsub("[^0-9.]", "", ISOSQT_max_data$`Peak Vertical Force % (Asym) (%)`))
-    ISOSQT_max_data$AsymmetrySide <- ifelse(grepl("R", ISOSQT_max_data$`Peak Vertical Force % (Asym) (%)`), "% R", "% L")
-    
-    asymmetry_annotations <- if(ISOSQT_max_data$AsymmetryValue > 15) {
-      list(
-        annotate("text", x = 0, y = 1, label = "Asymmetry:", hjust = 0, vjust = -3, color = "white", size = 8, family = "Good Times"),
-        annotate("text", x = 100, y = 1, label = paste(ISOSQT_max_data$AsymmetryValue, ISOSQT_max_data$AsymmetrySide), hjust = 1, vjust = -3, color = "white", size = 8, family = "Good Times")
-      )
-    } else {
-      list()
-    }
-    
-    vjust_value <- if(ISOSQT_max_data$AsymmetryValue > 15) -4 else -2.5
     
     ISOSQT_percentile_graph <- ISOSQT_graph_data %>% 
       ggplot(aes(x = max(PercentileRank), y = "")) +
@@ -550,35 +529,16 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = vjust_value, color = "#3d9be9", size = 12, family = "Good Times") +
-      annotate("text", x = 100, y = 1, label = paste(round(maxISOSQT, digits = 1), " N", sep = ""), hjust = 1, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
-      asymmetry_annotations
+      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = -2.5, color = "#3d9be9", size = 12, family = "Good Times") +
+      annotate("text", x = 100, y = 1, label = paste(round(maxISOSQT, digits = 1), " N", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
-    CMJ_graph_data <- CMJdata %>% 
+    SJ_graph_data <- SJdata %>% 
       filter(Name == athlete) %>%
-      select(Date, `Concentric Peak Force [N]`, `Peak Landing Force % (Asym) (%)`, PercentileRank)
+      select(Date, Level, Gender, Name, `Takeoff Peak Force [N]`, PercentileRank)
     
-    CMJ_max_data <- CMJ_graph_data %>% 
-      slice_max(order_by = `Concentric Peak Force [N]`, n = 1, with_ties = FALSE)
+    maxSJ <- max(SJ_graph_data$`Takeoff Peak Force [N]`, na.rm = TRUE)
     
-    maxCMJ <- max(CMJ_graph_data$`Concentric Peak Force [N]`, na.rm = TRUE)
-    
-    # Processing the asymmetry data
-    CMJ_max_data$AsymmetryValue <- as.numeric(gsub("[^0-9.]", "", CMJ_max_data$`Peak Landing Force % (Asym) (%)`))
-    CMJ_max_data$AsymmetrySide <- ifelse(grepl("R", CMJ_max_data$`Peak Landing Force % (Asym) (%)`), "% R", "% L")
-    
-    asymmetry_annotations <- if(CMJ_max_data$AsymmetryValue > 15) {
-      list(
-        annotate("text", x = 0, y = 1, label = "Asymmetry:", hjust = 0, vjust = -3, color = "white", size = 8, family = "Good Times"),
-        annotate("text", x = 100, y = 1, label = paste(CMJ_max_data$AsymmetryValue, CMJ_max_data$AsymmetrySide), hjust = 1, vjust = -3, color = "white", size = 8, family = "Good Times")
-      )
-    } else {
-      list()
-    }
-    
-    vjust_value <- if(CMJ_max_data$AsymmetryValue > 15) -4 else -2.5
-    
-    CMJ_percentile_graph <- CMJ_graph_data %>% 
+    SJ_percentile_graph <- SJ_graph_data %>% 
       ggplot(aes(x = max(PercentileRank), y = "")) +
       geom_segment(aes(x = 0, xend = 100, y = "", yend = ""), color = "#9b9b9b", linewidth = 1) +
       geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
@@ -598,20 +558,19 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = vjust_value, color = "#FF0000", size = 12, family = "Good Times") +
-      annotate("text", x = 100, y = 1, label = paste(round(maxCMJ, digits = 1), " N", sep = ""), hjust = 1, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
-      asymmetry_annotations
+      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "#FF0000", size = 12, family = "Good Times") +
+      annotate("text", x = 100, y = 1, label = paste(round(maxSJ, digits = 1), " N", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
-    legs_acc_percentile_score <- max(CMJ_graph_data$PercentileRank, na.rm = TRUE)
+    legs_acc_percentile_score <- max(SJ_graph_data$PercentileRank, na.rm = TRUE)
     
-    transformation_factor_three <- round(maxISOSQT / maxCMJ, digits = 3)
+    transformation_factor_three <- round(maxISOSQT / maxSJ, digits = 3)
     
     combined_legs_plot <- ISOSQT_graph_data %>%
       ggplot(aes(x = Date)) +
       geom_line(aes(y = `Peak Vertical Force [N]`, color = "Isometric Belt Squat (Strength)"), linewidth = 2) +
       geom_point(aes(y = `Peak Vertical Force [N]`, color = "Isometric Belt Squat (Strength)"), size = 4) +
-      geom_line(data = CMJ_graph_data, aes(y = `Concentric Peak Force [N]` * transformation_factor_three, color = "CMJ (Speed)"), linewidth = 2) +
-      geom_point(data = CMJ_graph_data, aes(y = `Concentric Peak Force [N]` * transformation_factor_three, color = "CMJ (Speed)"), size = 4) +
+      geom_line(data = SJ_graph_data, aes(y = `Takeoff Peak Force [N]` * transformation_factor_three, color = "Squat Jump (Speed)"), linewidth = 2) +
+      geom_point(data = SJ_graph_data, aes(y = `Takeoff Peak Force [N]` * transformation_factor_three, color = "Squat Jump (Speed)"), size = 4) +
       labs(y = "Strength (N)\n") +
       scale_y_continuous(
         limits = c(legs_ylim_min, legs_ylim_max),
@@ -631,33 +590,33 @@ for (athlete in athletes){
         axis.text.x = element_text(color = "white", size = 15)
       ) +
       scale_color_manual(values = c("Isometric Belt Squat (Strength)" = "#3d9be9", 
-                                    "CMJ (Speed)" = "#FF0000"),
+                                    "Squat Jump (Speed)" = "#FF0000"),
                          breaks = c("Isometric Belt Squat (Strength)", 
-                                    "CMJ (Speed)"))
+                                    "Squat Jump (Speed)"))
     
     legs_power_percentile_score <- max(ISOSQT_graph_data$PercentileRank, na.rm = TRUE)
-    legs_acc_percentile_score <- max(CMJ_graph_data$PercentileRank, na.rm = TRUE)
+    legs_acc_percentile_score <- max(SJ_graph_data$PercentileRank, na.rm = TRUE)
     
-    ggsave(combined_legs_plot,file=paste0("Futures Reports Images/", athlete,"_legsPlot.png"), width=7,height=3,units="in", dpi = 150)
+    ggsave(combined_legs_plot,file=paste0("Futures Reports Images/", athlete,"_legsPlot.png"), width=7.5,height=3.5,units="in", dpi = 150)
     strengthCharts4 <- image_read(paste0("Futures Reports Images/", athlete,"_legsPlot.png"))
-    PitchingReport5 <- image_composite(PitchingReport4, strengthCharts4, offset= "+120+2175")
+    PitchingReport5 <- image_composite(PitchingReport4, strengthCharts4, offset= "+115+2100")
     
     ggsave(ISOSQT_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_ISOPercentiles.png"), width=7,height=3,units="in", dpi = 150)
     strengthCharts5 <- image_read(paste0("Futures Reports Images/", athlete,"_ISOPercentiles.png"))
-    PitchingReport6 <- image_composite(PitchingReport5, strengthCharts5, offset= "+110+2600")
+    PitchingReport6 <- image_composite(PitchingReport5, strengthCharts5, offset= "+140+2600")
     
-    ggsave(CMJ_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_CMJPercentiles.png"), width=7,height=3,units="in", dpi = 150)
-    strengthCharts6 <- image_read(paste0("Futures Reports Images/", athlete,"_CMJPercentiles.png"))
-    PitchingReport7 <- image_composite(PitchingReport6, strengthCharts6, offset= "+110+2825")
+    ggsave(SJ_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_SquatJumpPercentiles.png"), width=7,height=3,units="in", dpi = 150)
+    strengthCharts6 <- image_read(paste0("Futures Reports Images/", athlete,"_SquatJumpPercentiles.png"))
+    PitchingReport7 <- image_composite(PitchingReport6, strengthCharts6, offset= "+140+2835")
     
-  } else if (athlete_in_ISOSQTdata && !athlete_in_CMJdata) {
+  } else if (athlete_in_ISOSQTdata && !athlete_in_SJdata) {
     
     legs_ylim_min <- min(ISOSQTdata$`Peak Vertical Force [N]`, na.rm = TRUE)
     legs_ylim_max <- max(ISOSQTdata$`Peak Vertical Force [N]`, na.rm = TRUE)
     
     ISOSQT_graph_data <- ISOSQTdata %>% 
       filter(Name == athlete) %>%
-      select(Date, Level, Gender, Name, `Peak Vertical Force [N]`, `Peak Vertical Force % (Asym) (%)`, PercentileRank)
+      select(Date, Level, Gender, Name, `Peak Vertical Force [N]`, PercentileRank)
     
     ISOSQT_max_data <- ISOSQT_graph_data %>% 
       slice_max(order_by = `Peak Vertical Force [N]`, n = 1, with_ties = FALSE)
@@ -672,21 +631,6 @@ for (athlete in athletes){
     legs_ylim_max <- round(max(legs_ylim_data$`Peak Vertical Force [N]`, na.rm = TRUE))
     
     maxISOSQT <- max(ISOSQT_graph_data$`Peak Vertical Force [N]`, na.rm = TRUE)
-    
-    # Processing the asymmetry data
-    ISOSQT_max_data$AsymmetryValue <- as.numeric(gsub("[^0-9.]", "", ISOSQT_max_data$`Peak Vertical Force % (Asym) (%)`))
-    ISOSQT_max_data$AsymmetrySide <- ifelse(grepl("R", ISOSQT_max_data$`Peak Vertical Force % (Asym) (%)`), "% R", "% L")
-    
-    asymmetry_annotations <- if(ISOSQT_max_data$AsymmetryValue > 15) {
-      list(
-        annotate("text", x = 0, y = 1, label = "Asymmetry:", hjust = 0, vjust = -3, color = "white", size = 8, family = "Good Times"),
-        annotate("text", x = 100, y = 1, label = paste(ISOSQT_max_data$AsymmetryValue, ISOSQT_max_data$AsymmetrySide), hjust = 1, vjust = -3, color = "white", size = 8, family = "Good Times")
-      )
-    } else {
-      list()
-    }
-    
-    vjust_value <- if(ISOSQT_max_data$AsymmetryValue > 15) -4 else -2.5
     
     ISOSQT_percentile_graph <- ISOSQT_graph_data %>% 
       ggplot(aes(x = max(PercentileRank), y = "")) +
@@ -708,9 +652,8 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = vjust_value, color = "#3d9be9", size = 12, family = "Good Times") +
-      annotate("text", x = 100, y = 1, label = paste(round(maxISOSQT, digits = 1), " N", sep = ""), hjust = 1, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
-      asymmetry_annotations
+      annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = -2.5, color = "#3d9be9", size = 12, family = "Good Times") +
+      annotate("text", x = 100, y = 1, label = paste(round(maxISOSQT, digits = 1), " N", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
     # Extract the last two data points from the `ISOSQT_graph_data` dataframe
     last_two_points_isosqt <- tail(ISOSQT_graph_data$`Peak Vertical Force [N]`, 2)
@@ -742,49 +685,31 @@ for (athlete in athletes){
     legs_power_percentile_score <- max(ISOSQT_graph_data$PercentileRank, na.rm = TRUE)
     legs_acc_percentile_score <- 0
     
-    ggsave(ISOSQT_graph,file=paste0("Futures Reports Images/", athlete,"_ISOSQTplot.png"), width=6,height=3,units="in", dpi = 150)
+    ggsave(ISOSQT_graph,file=paste0("Futures Reports Images/", athlete,"_ISOSQTplot.png"), width=7.5,height=3.5,units="in", dpi = 150)
     strengthCharts4 <- image_read(paste0("Futures Reports Images/", athlete,"_ISOSQTplot.png"))
-    PitchingReport5 <- image_composite(PitchingReport4, strengthCharts4, offset= "+175+2175")
+    PitchingReport5 <- image_composite(PitchingReport4, strengthCharts4, offset= "+115+2100")
     
     ggsave(ISOSQT_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_ISOSQTperctiles.png"), width=7,height=3,units="in", dpi = 150)
     strengthCharts5 <- image_read(paste0("Futures Reports Images/", athlete,"_ISOSQTperctiles.png"))
-    PitchingReport6 <- image_composite(PitchingReport5, strengthCharts5, offset= "+110+2600")
+    PitchingReport6 <- image_composite(PitchingReport5, strengthCharts5, offset= "+140+2600")
     
     empty_legs_percentile_graph <- generate_empty_percentile_graph()
-    ggsave(empty_legs_percentile_graph, file=paste0("Futures Reports Images/", athlete, "_CMJPercentiles.png"), width=6, height=1, units="in", dpi=150)
-    strengthCharts6 <- image_read(paste0("Futures Reports Images/", athlete, "_CMJPercentiles.png"))
-    PitchingReport7 <- image_composite(PitchingReport6, strengthCharts6, offset= "+175+2900")
+    ggsave(empty_legs_percentile_graph, file=paste0("Futures Reports Images/", athlete, "_SquatJumpPercentiles.png"), width=7, height=3, units="in", dpi=150)
+    strengthCharts6 <- image_read(paste0("Futures Reports Images/", athlete, "_SquatJumpPercentiles.png"))
+    PitchingReport7 <- image_composite(PitchingReport6, strengthCharts6, offset= "+140+2835")
     
-  } else if (!athlete_in_ISOSQTdata && athlete_in_CMJdata) {
+  } else if (!athlete_in_ISOSQTdata && athlete_in_SJdata) {
     
-    CMJ_ylim_min <- min(CMJdata$`Concentric Peak Force [N]`, na.rm = TRUE)
-    CMJ_ylim_max <- max(CMJdata$`Concentric Peak Force [N]`, na.rm = TRUE)
+    SJ_ylim_min <- min(SJdata$`Takeoff Peak Force [N]`, na.rm = TRUE)
+    SJ_ylim_max <- max(SJdata$`Takeoff Peak Force [N]`, na.rm = TRUE)
     
-    CMJ_graph_data <- CMJdata %>% 
+    SJ_graph_data <- SJdata %>% 
       filter(Name == athlete) %>%
-      select(Date, `Concentric Peak Force [N]`, `Peak Landing Force % (Asym) (%)`, PercentileRank)
+      select(Date, Level, Gender, Name, `Takeoff Peak Force [N]`, PercentileRank)
     
-    CMJ_max_data <- CMJ_graph_data %>% 
-      slice_max(order_by = `Concentric Peak Force [N]`, n = 1, with_ties = FALSE)
+    maxSJ <- max(SJ_graph_data$`Takeoff Peak Force [N]`, na.rm = TRUE)
     
-    maxCMJ <- max(CMJ_graph_data$`Concentric Peak Force [N]`, na.rm = TRUE)
-    
-    # Processing the asymmetry data
-    CMJ_max_data$AsymmetryValue <- as.numeric(gsub("[^0-9.]", "", CMJ_max_data$`Peak Landing Force % (Asym) (%)`))
-    CMJ_max_data$AsymmetrySide <- ifelse(grepl("R", CMJ_max_data$`Peak Landing Force % (Asym) (%)`), "% R", "% L")
-    
-    asymmetry_annotations <- if(CMJ_max_data$AsymmetryValue > 15) {
-      list(
-        annotate("text", x = 0, y = 1, label = "Asymmetry:", hjust = 0, vjust = -3, color = "white", size = 8, family = "Good Times"),
-        annotate("text", x = 100, y = 1, label = paste(CMJ_max_data$AsymmetryValue, CMJ_max_data$AsymmetrySide), hjust = 1, vjust = -3, color = "white", size = 8, family = "Good Times")
-      )
-    } else {
-      list()
-    }
-    
-    vjust_value <- if(CMJ_max_data$AsymmetryValue > 15) -4 else -2.5
-    
-    CMJ_percentile_graph <- CMJ_graph_data %>% 
+    SJ_percentile_graph <- SJ_graph_data %>% 
       ggplot(aes(x = max(PercentileRank), y = "")) +
       geom_segment(aes(x = 0, xend = 100, y = "", yend = ""), color = "#9b9b9b", linewidth = 1) +
       geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
@@ -804,19 +729,18 @@ for (athlete in athletes){
             axis.ticks.x = element_blank(),
             axis.text.x = element_blank(),
             axis.title.x = element_blank()) +
-      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = vjust_value, color = "#FF0000", size = 12, family = "Good Times") +
-      annotate("text", x = 100, y = 1, label = paste(round(maxCMJ, digits = 1), " N", sep = ""), hjust = 1, vjust = vjust_value, color = "white", size = 12, family = "Good Times") +
-      asymmetry_annotations
+      annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "#FF0000", size = 12, family = "Good Times") +
+      annotate("text", x = 100, y = 1, label = paste(round(maxSJ, digits = 1), " N", sep = ""), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
     # Extract the last two data points from the `ISOSQT_graph_data` dataframe
-    last_two_points_CMJ <- tail(CMJ_graph_data$`Concentric Peak Force [N]`, 2)
+    last_two_points_SJ <- tail(SJ_graph_data$`Takeoff Peak Force [N]`, 2)
     
     # Check if the most recent data point is less than the previous data point
-    set_ylim_CMJ <- if (length(last_two_points_CMJ) == 2 && last_two_points_CMJ[2] < last_two_points_CMJ[1]) TRUE else FALSE
+    set_ylim_SJ <- if (length(last_two_points_SJ) == 2 && last_two_points_SJ[2] < last_two_points_SJ[1]) TRUE else FALSE
     
     # Build the plot
-    CMJ_graph <- CMJ_graph_data %>%
-      ggplot(aes(x = Date, y = `Concentric Peak Force [N]`, color = "CMJ")) +
+    SJ_graph <- SJ_graph_data %>%
+      ggplot(aes(x = Date, y = `Takeoff Peak Force [N]`, color = "SJ")) +
       geom_line(linewidth = 2) +
       geom_point(size = 4) +
       theme_minimal() +
@@ -827,48 +751,48 @@ for (athlete in athletes){
             axis.title.y = element_blank(),
             axis.title.x = element_blank(),
             axis.text=element_text(color = "white", size = 15)) +
-      scale_color_manual(values = c("CMJ" = "#FF0000"),
-                         breaks = c("CMJ"))
+      scale_color_manual(values = c("SJ" = "#FF0000"),
+                         breaks = c("SJ"))
     
     # Apply ylim conditionally
-    if (set_ylim_CMJ) {
-      CMJ_graph <- CMJ_graph + ylim(CMJ_ylim_min, CMJ_ylim_max)
+    if (set_ylim_SJ) {
+      SJ_graph <- SJ_graph + ylim(SJ_ylim_min, SJ_ylim_max)
     }
     
-    legs_acc_percentile_score <- max(CMJ_graph_data$PercentileRank, na.rm = TRUE)
+    legs_acc_percentile_score <- max(SJ_graph_data$PercentileRank, na.rm = TRUE)
     legs_power_percentile_score <- 0
     
-    ggsave(CMJ_graph,file=paste0("Futures Reports Images/", athlete,"_CMJplot.png"), width=6,height=3,units="in", dpi = 150)
-    strengthCharts4 <- image_read(paste0("Futures Reports Images/", athlete,"_CMJplot.png"))
-    PitchingReport5 <- image_composite(PitchingReport4, strengthCharts4, offset= "+175+2175")
+    ggsave(SJ_graph,file=paste0("Futures Reports Images/", athlete,"_SJplot.png"), width=7.5,height=3.5,units="in", dpi = 150)
+    strengthCharts4 <- image_read(paste0("Futures Reports Images/", athlete,"_SJplot.png"))
+    PitchingReport5 <- image_composite(PitchingReport4, strengthCharts4, offset= "+115+2100")
     
     empty_legs_percentile_graph <- generate_empty_percentile_graph()
-    ggsave(empty_legs_percentile_graph, file=paste0("Futures Reports Images/", athlete, "_ISOSQTperctiles.png"), width=6, height=1, units="in", dpi=150)
+    ggsave(empty_legs_percentile_graph, file=paste0("Futures Reports Images/", athlete, "_ISOSQTperctiles.png"), width=7, height=3, units="in", dpi=150)
     strengthCharts5 <- image_read(paste0("Futures Reports Images/", athlete, "_ISOSQTperctiles.png"))
-    PitchingReport6 <- image_composite(PitchingReport5, strengthCharts5, offset= "+175+2700")
+    PitchingReport6 <- image_composite(PitchingReport5, strengthCharts5, offset= "+140+2600")
     
-    ggsave(CMJ_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_CMJPercentiles.png"), width=7,height=3,units="in", dpi = 150)
-    strengthCharts6 <- image_read(paste0("Futures Reports Images/", athlete,"_CMJPercentiles.png"))
-    PitchingReport7 <- image_composite(PitchingReport6, strengthCharts6, offset= "+110+2825")
+    ggsave(SJ_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_SquatJumpPercentiles.png"), width=7,height=3,units="in", dpi = 150)
+    strengthCharts6 <- image_read(paste0("Futures Reports Images/", athlete,"_SquatJumpPercentiles.png"))
+    PitchingReport7 <- image_composite(PitchingReport6, strengthCharts6, offset= "+140+2835")
   } else {
     
     legs_power_percentile_score <- 0
     legs_acc_percentile_score <- 0
     
     empty_legs_plot <- generate_empty_legs_plot()
-    ggsave(empty_legs_plot, file=paste0("Futures Reports Images/", athlete, "_CMJplot.png"), width=6, height=3, units="in", dpi=150)
-    strengthCharts4 <- image_read(paste0("Futures Reports Images/", athlete, "_CMJplot.png"))
-    PitchingReport5 <- image_composite(PitchingReport4, strengthCharts4, offset= "+175+2200")
+    ggsave(empty_legs_plot, file=paste0("Futures Reports Images/", athlete, "_SJplot.png"), width=7.5, height=3.5, units="in", dpi=150)
+    strengthCharts4 <- image_read(paste0("Futures Reports Images/", athlete, "_SJplot.png"))
+    PitchingReport5 <- image_composite(PitchingReport4, strengthCharts4, offset= "+115+2100")
     
     empty_legs_percentile_graph <- generate_empty_percentile_graph()
-    ggsave(empty_legs_percentile_graph, file=paste0("Futures Reports Images/", athlete, "_ISOSQTperctiles.png"), width=6, height=1, units="in", dpi=150)
+    ggsave(empty_legs_percentile_graph, file=paste0("Futures Reports Images/", athlete, "_ISOSQTperctiles.png"), width=7, height=3, units="in", dpi=150)
     strengthCharts5 <- image_read(paste0("Futures Reports Images/", athlete, "_ISOSQTperctiles.png"))
-    PitchingReport6 <- image_composite(PitchingReport5, strengthCharts5, offset= "+175+2700")
+    PitchingReport6 <- image_composite(PitchingReport5, strengthCharts5, offset= "+140+2600")
     
     empty_legs_percentile_graph <- generate_empty_percentile_graph()
-    ggsave(empty_legs_percentile_graph, file=paste0("Futures Reports Images/", athlete, "_CMJPercentiles.png"), width=6, height=1, units="in", dpi=150)
-    strengthCharts6 <- image_read(paste0("Futures Reports Images/", athlete, "_CMJPercentiles.png"))
-    PitchingReport7 <- image_composite(PitchingReport6, strengthCharts6, offset= "+175+2900")
+    ggsave(empty_legs_percentile_graph, file=paste0("Futures Reports Images/", athlete, "_SquatJumpPercentiles.png"), width=7, height=3, units="in", dpi=150)
+    strengthCharts6 <- image_read(paste0("Futures Reports Images/", athlete, "_SquatJumpPercentiles.png"))
+    PitchingReport7 <- image_composite(PitchingReport6, strengthCharts6, offset= "+140+2835")
   }
   
   ########################################################################################################
@@ -882,9 +806,9 @@ for (athlete in athletes){
                (`exercise name` == "Chest Press (One Hand)" | `exercise name` == "Horizontal Row (One Hand)" | `exercise name` == "PushPull" |
                   `exercise name` == "PNF D2 Extension" | `exercise name` == "PNF D2 Flexion" | `exercise name` == "Shot Put (Countermovement)")) %>%
       group_by(`session createdAt`, `exercise name`, Level, Gender) %>%
-      summarize(`power - mean` = round(mean(`power - mean`, na.rm = TRUE)),
+      summarize(`power - high` = round(mean(`power - high`, na.rm = TRUE)),
                 PowerPercentileRank = max(PowerPercentileRank, na.rm = TRUE),
-                `acceleration - mean` = round(mean(`acceleration - mean`, na.rm = TRUE)),
+                `acceleration - high` = round(mean(`acceleration - high`, na.rm = TRUE)),
                 AccelerationPercentileRank = max(AccelerationPercentileRank, na.rm = TRUE),
                 .groups = "drop")
     
@@ -894,11 +818,11 @@ for (athlete in athletes){
     arms_ylim_data <- proteusData %>% 
       filter(Level == arms_level, Gender == arms_gender)
     
-    arms_ylim_min <- round(min(arms_ylim_data$`power - mean`[arms_ylim_data$`exercise name` == "PushPull"], na.rm = TRUE))
-    arms_ylim_max <- round(max(arms_ylim_data$`power - mean`[arms_ylim_data$`exercise name` == "PushPull"], na.rm = TRUE))
+    arms_ylim_min <- round(min(arms_ylim_data$`power - high`[arms_ylim_data$`exercise name` == "PushPull"], na.rm = TRUE))
+    arms_ylim_max <- round(max(arms_ylim_data$`power - high`[arms_ylim_data$`exercise name` == "PushPull"], na.rm = TRUE))
     
     # Calculating max values for each exercise and dominance type
-    max_power_pushpull <- max(pushpull_graph_data$`power - mean`[pushpull_graph_data$`exercise name` == "PushPull"], na.rm = TRUE)
+    max_power_pushpull <- max(pushpull_graph_data$`power - high`[pushpull_graph_data$`exercise name` == "PushPull"], na.rm = TRUE)
     
     pushpull_power_percentile_graph <- pushpull_graph_data %>%
       filter(`exercise name` == "PushPull") %>% 
@@ -924,7 +848,7 @@ for (athlete in athletes){
       annotate("text", x = 0, y = 1, label = "Strength Max: ", hjust = 0, vjust = -2.5, color = "#3d9be9", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(max_power_pushpull, digits = 1), "W"), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
-    max_acc_pushpull <- max(pushpull_graph_data$`acceleration - mean`[pushpull_graph_data$`exercise name` == "PushPull"], na.rm = TRUE)
+    max_acc_pushpull <- max(pushpull_graph_data$`acceleration - high`[pushpull_graph_data$`exercise name` == "PushPull"], na.rm = TRUE)
     
     pushpull_acc_percentile_graph <- pushpull_graph_data %>%
       filter(`exercise name` == "PushPull") %>% 
@@ -950,15 +874,15 @@ for (athlete in athletes){
       annotate("text", x = 0, y = 1, label = "Speed Max: ", hjust = 0, vjust = -2.5, color = "#FF0000", size = 12, family = "Good Times") +
       annotate("text", x = 100, y = 1, label = paste(round(max_acc_pushpull, digits = 1), "m/s²"), hjust = 1, vjust = -2.5, color = "white", size = 12, family = "Good Times")
     
-    transformation_factor_two = round(max_power_pushpull / max_acc_pushpull, digits = 3)
+    transformation_factor_two = round(max_power_pushpull / max_acc_pushpull, digits = 1)
     
     pushpull_power_graph <- pushpull_graph_data %>%
       filter(`exercise name` == "PushPull") %>% 
       ggplot(aes(x = `session createdAt`)) +
-      geom_line(aes(y = `power - mean`, color = "Push/Pull (Strength)"), linewidth = 2) +
-      geom_point(aes(y = `power - mean`, color = "Push/Pull (Strength)"), size = 4) +
-      geom_line(aes(y = `acceleration - mean` * transformation_factor_two, color = "Push/Pull (Speed)"), linewidth = 2) +
-      geom_point(aes(y = `acceleration - mean` * transformation_factor_two, color = "Push/Pull (Speed)"), size = 4) +
+      geom_line(aes(y = `power - high`, color = "Push/Pull (Strength)"), linewidth = 2) +
+      geom_point(aes(y = `power - high`, color = "Push/Pull (Strength)"), size = 4) +
+      geom_line(aes(y = `acceleration - high` * transformation_factor_two, color = "Push/Pull (Speed)"), linewidth = 2) +
+      geom_point(aes(y = `acceleration - high` * transformation_factor_two, color = "Push/Pull (Speed)"), size = 4) +
       labs(y = "Strength (W)\n") +
       scale_y_continuous(
         limits = c(arms_ylim_min, arms_ylim_max),
@@ -986,27 +910,15 @@ for (athlete in athletes){
     pushpull_power_percentile_score <- max(pushpull_graph_data$PowerPercentileRank, na.rm = TRUE)
     pushpull_acc_percentile_score <- max(pushpull_graph_data$AccelerationPercentileRank, na.rm = TRUE)
     
-    # Calculate max power and acceleration percentile scores for PNF D2 Flexion
-    flexion_data <- filter(pushpull_graph_data, `exercise name` == "PNF D2 Flexion")
-    flexion_power_percentile_score <- max(flexion_data$PowerPercentileRank, na.rm = TRUE)
-    flexion_data <- filter(pushpull_graph_data, `exercise name` == "PNF D2 Flexion")
-    flexion_acc_percentile_score <- max(flexion_data$AccelerationPercentileRank, na.rm = TRUE)
-    
-    # Calculate max power and acceleration percentile scores for PNF D2 Extension
-    extension_data <- filter(pushpull_graph_data, `exercise name` == "PNF D2 Extension")
-    extension_power_percentile_score <- max(extension_data$PowerPercentileRank, na.rm = TRUE)
-    extension_data <- filter(pushpull_graph_data, `exercise name` == "PNF D2 Extension")
-    extension_acc_percentile_score <- max(extension_data$AccelerationPercentileRank, na.rm = TRUE)
-    
     # Calculate max power and acceleration percentile scores for Shot Put (Countermovement)
     shotput_data <- filter(pushpull_graph_data, `exercise name` == "Shot Put (Countermovement)")
     shotput_power_percentile_score <- max(shotput_data$PowerPercentileRank, na.rm = TRUE)
     shotput_data <- filter(pushpull_graph_data, `exercise name` == "Shot Put (Countermovement)")
     shotput_acc_percentile_score <- max(shotput_data$AccelerationPercentileRank, na.rm = TRUE)
     
-    ggsave(pushpull_power_graph,file=paste0("Futures Reports Images/", athlete,"_pushpullPlot.png"), width=7,height=3.25,units="in", dpi = 150)
+    ggsave(pushpull_power_graph,file=paste0("Futures Reports Images/", athlete,"_pushpullPlot.png"), width=7.5,height=3.5,units="in", dpi = 150)
     strengthCharts7 <- image_read(paste0("Futures Reports Images/", athlete,"_pushpullPlot.png"))
-    PitchingReport8 <- image_composite(PitchingReport7, strengthCharts7, offset= "+1360+2175")
+    PitchingReport8 <- image_composite(PitchingReport7, strengthCharts7, offset= "+1320+2100")
     
     ggsave(pushpull_power_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_pushpullStrengthPercentile.png"), width=7,height=3,units="in", dpi = 150)
     strengthCharts8 <- image_read(paste0("Futures Reports Images/", athlete,"_pushpullStrengthPercentile.png"))
@@ -1014,7 +926,7 @@ for (athlete in athletes){
     
     ggsave(pushpull_acc_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_pushpullSpeedPercentile.png"), width=7,height=3,units="in", dpi = 150)
     strengthCharts9 <- image_read(paste0("Futures Reports Images/", athlete,"_pushpullSpeedPercentile.png"))
-    PitchingReport10 <- image_composite(PitchingReport9, strengthCharts9, offset= "+1350+2825")
+    PitchingReport10 <- image_composite(PitchingReport9, strengthCharts9, offset= "+1350+2835")
   }else{
     
     empty_arms_df <- data.frame()
@@ -1025,53 +937,37 @@ for (athlete in athletes){
       geom_point(aes(x = 0, y = ""), color = "#9b9b9b", size = 5) +
       geom_point(aes(x = 50, y = ""), color = "#9b9b9b", size = 5) +
       geom_point(aes(x = 100, y = ""), color = "#9b9b9b", size = 5) +
-      theme_minimal() +
-      theme(legend.position = "none",
-            panel.background =  element_blank(),
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank(),
-            axis.ticks.y = element_blank(),
-            axis.text.y = element_blank(),
-            axis.title.y = element_blank(),
-            axis.ticks.x = element_blank(),
-            axis.text.x = element_blank(),
-            axis.title.x = element_blank()
-      )
+      theme_void()
     
     empty_arms_plot <- empty_arms_df %>% 
       ggplot() + 
       geom_point() + 
       xlim(0, 10) + 
-      ylim(0, 100) +
+      ylim(0, 100)  +
       annotate("text", x = 5, y = 50, label = "No data collected.\nPlease bring report to Futures Coaches to test.", 
-               size = 8, color = "white", hjust = 0.5, vjust = 0.5) +
+               size = 10, color = "white", hjust = 0.5, vjust = 0.5) +
       theme_minimal() +
       theme(panel.grid = element_line(color = col_grid),
-            axis.title.y = element_blank(),
-            axis.title.x = element_blank(),
-            axis.text=element_text(color = "white", size = 15)
-      )
+            axis.title = element_blank(),
+            axis.text = element_blank(),
+            axis.ticks = element_blank())
     
     pushpull_power_percentile_score <- 0
     pushpull_acc_percentile_score <- 0
-    flexion_power_percentile_score <- 0
-    flexion_acc_percentile_score <- 0
-    extension_power_percentile_score <- 0
-    extension_acc_percentile_score <- 0
     shotput_power_percentile_score <- 0
     shotput_acc_percentile_score <- 0
     
-    ggsave(empty_arms_plot,file=paste0("Futures Reports Images/", athlete,"_pushpullPlot.png"), width=6,height=3,units="in", dpi = 150)
+    ggsave(empty_arms_plot,file=paste0("Futures Reports Images/", athlete,"_pushpullPlot.png"), width=7.5,height=3.5,units="in", dpi = 150)
     strengthCharts7 <- image_read(paste0("Futures Reports Images/", athlete,"_pushpullPlot.png"))
-    PitchingReport8 <- image_composite(PitchingReport7, strengthCharts7, offset= "+1425+2200")
+    PitchingReport8 <- image_composite(PitchingReport7, strengthCharts7, offset= "+1320+2100")
     
-    ggsave(empty_arms_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_pushpullStrengthPercentile.png"), width=6,height=1,units="in", dpi = 150)
+    ggsave(empty_arms_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_pushpullStrengthPercentile.png"), width=7,height=3,units="in", dpi = 150)
     strengthCharts8 <- image_read(paste0("Futures Reports Images/", athlete,"_pushpullStrengthPercentile.png"))
-    PitchingReport9<- image_composite(PitchingReport8, strengthCharts8, offset= "+1425+2700")
+    PitchingReport9<- image_composite(PitchingReport8, strengthCharts8, offset= "+1350+2600")
     
-    ggsave(empty_arms_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_pushpullSpeedPercentile.png"), width=6,height=1,units="in", dpi = 150)
+    ggsave(empty_arms_percentile_graph,file=paste0("Futures Reports Images/", athlete,"_pushpullSpeedPercentile.png"), width=7,height=3,units="in", dpi = 150)
     strengthCharts9 <- image_read(paste0("Futures Reports Images/", athlete,"_pushpullSpeedPercentile.png"))
-    PitchingReport10 <- image_composite(PitchingReport9, strengthCharts9, offset= "+1425+2900")
+    PitchingReport10 <- image_composite(PitchingReport9, strengthCharts9, offset= "+1350+2835")
   }
   
   ########################################################################################################
@@ -1088,7 +984,7 @@ for (athlete in athletes){
   
   ggsave(core_text,file=paste0("Futures Reports Images/", athlete,"_coreText.png"), width=5,height=1,units="in", dpi = 150)
   strengthCharts10 <- image_read(paste0("Futures Reports Images/", athlete,"_coreText.png"))
-  PitchingReport11 <- image_composite(PitchingReport10, strengthCharts10, offset= "+1500+1775")
+  PitchingReport11 <- image_composite(PitchingReport10, strengthCharts10, offset= "+1500+1800")
   
   deadlift_subset <- finalExercise_data$`Max Value`[finalExercise_data$`Exercise Name` == "Trap Bar Deadlift"]
   max_deadlift <- if (all(is.na(deadlift_subset))) NA else max(deadlift_subset, na.rm = TRUE)
@@ -1103,7 +999,7 @@ for (athlete in athletes){
   
   ggsave(lowerbody_text,file=paste0("Futures Reports Images/", athlete,"_lowerbodyText.png"), width=8,height=1,units="in", dpi = 150)
   strengthCharts11 <- image_read(paste0("Futures Reports Images/", athlete,"_lowerbodyText.png"))
-  PitchingReport12 <- image_composite(PitchingReport11, strengthCharts11, offset= "+40+3075")
+  PitchingReport12 <- image_composite(PitchingReport11, strengthCharts11, offset= "+65+3100")
   
   bench_subset <- finalExercise_data$`Max Value`[finalExercise_data$`Exercise Name` == "Barbell Bench Press"]
   max_bench <- if (all(is.na(bench_subset))) NA else max(bench_subset, na.rm = TRUE)
@@ -1118,16 +1014,14 @@ for (athlete in athletes){
   
   ggsave(upperbody_text,file=paste0("Futures Reports Images/", athlete,"_upperbodyText.png"), width=8,height=1,units="in", dpi = 150)
   strengthCharts12 <- image_read(paste0("Futures Reports Images/", athlete,"_upperbodyText.png"))
-  PitchingReport13 <- image_composite(PitchingReport12, strengthCharts12, offset= "+1285+3075")
+  PitchingReport13 <- image_composite(PitchingReport12, strengthCharts12, offset= "+1285+3100")
   
   ########################################################################################################
   ###########################################  Strength Score  ###########################################
   ########################################################################################################
   
-  scores <- c(core_power_percentile_score, core_acc_percentile_score, legs_power_percentile_score, 
-              legs_acc_percentile_score, pushpull_power_percentile_score, pushpull_acc_percentile_score,
-              flexion_power_percentile_score, flexion_acc_percentile_score, extension_power_percentile_score,
-              extension_acc_percentile_score, shotput_power_percentile_score, shotput_acc_percentile_score)
+  scores <- c(core_power_percentile_score, core_acc_percentile_score, legs_power_percentile_score, legs_acc_percentile_score, 
+              pushpull_power_percentile_score, pushpull_acc_percentile_score,shotput_power_percentile_score, shotput_acc_percentile_score)
   
   strengthScore <- round(mean(scores, na.rm = TRUE), digits = 1)
   
@@ -1158,7 +1052,7 @@ for (athlete in athletes){
         panel.background = element_blank())
   } else {
     strengthScore_plot <- attendance_plot_data %>% 
-      ggplot(aes(x = `Client name`, y = strengthScore)) +
+      ggplot(aes(x = Name, y = strengthScore)) +
       geom_col(aes(fill = get_color_two(strengthScore))) +
       geom_col(aes(y = 100), alpha = 0.5, color = "black") +
       geom_text(aes(y = 50, label = paste(strengthScore)), size = 14, fontface = "bold", color = "white") +
@@ -1176,7 +1070,7 @@ for (athlete in athletes){
   
   ggsave(strengthScore_plot,file=paste0("Futures Reports Images/", athlete,"_strengthScore.png"), width=6,height=1,units="in", dpi = 150)
   strengthScorePlot <- image_read(paste0("Futures Reports Images/", athlete,"_strengthScore.png"))
-  PitchingReport14 <- image_composite(PitchingReport13, strengthScorePlot, offset= "+1425+475")
+  PitchingReport14 <- image_composite(PitchingReport13, strengthScorePlot, offset= "+1425+450")
   
   image_write(PitchingReport14,path = "page1.pdf",format="pdf",quality=100,density=300)
   image_write(IndexPage,path = "page2.pdf",format="pdf",quality=100,density=300)
@@ -1184,5 +1078,3 @@ for (athlete in athletes){
   qpdf::pdf_combine(input = c("page1.pdf", "page2.pdf"),
                     output = paste0(athlete_folder, "/", "Futures Physicality Report.pdf"))
 }
-
-# write.csv(low_attendance_athletes, "/Users/watts/Downloads/StrengthAttendanceList.csv")

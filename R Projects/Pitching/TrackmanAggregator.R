@@ -14,7 +14,7 @@ for (file in csv_files) {
 }
 
 # Write the combined data frame to a new CSV file
-write.csv(combined_data, "combined_data.csv", row.names = FALSE)
+write.csv(combined_data, "/Users/watts/Documents/Futures Performance Center/Data/practice/masterTrackmanData.csv", row.names = FALSE)
 
 # Print a message to confirm the process is completed
-cat("All CSV files have been combined into 'combined_data.csv'.\n")
+cat("All CSV files have been combined into 'masterTrackmanData.csv'.\n")

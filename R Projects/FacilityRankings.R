@@ -1,11 +1,17 @@
 library(dplyr)
 library(readr)
 
-hittingData <- read_csv("/Volumes/COLE'S DATA/Data/Data Dump/HittingFacilityData.csv")
+hittingData <- read_csv("/Users/watts/Documents/Futures Performance Center/Data/Facility Data/HittingFacilityData.csv")
 
 # Assuming 'hittingData' is your dataframe name
 filtered_hittingData <- hittingData %>%
-  filter(Month == "January", Level %in% c("L1", "L2", "L3"))
+  filter(Month == "March", Level %in% c("L1 (9u-11u)", "L2 (12u-14u)", "L3 (15u-18u)")) %>%
+  mutate(Level = case_when(
+    Level == "L1 (9u-11u)" ~ "L1",
+    Level == "L2 (12u-14u)" ~ "L2",
+    Level == "L3 (15u-18u)" ~ "L3",
+    TRUE ~ Level # This keeps the original value if none of the above conditions are met
+  ))
 
 # Ranking by MaxVel within each Level
 ranking_maxvel <- filtered_hittingData %>%
@@ -21,10 +27,16 @@ ranking_batspeed <- filtered_hittingData %>%
   select(Name, Level, Rank, `Bat Speed (mph)`)
 
 
-pitchingData <- read_csv("/Volumes/COLE'S DATA/Data/Data Dump/PitchingFacilityData.csv")
+pitchingData <- read_csv("/Users/watts/Documents/Futures Performance Center/Data/Facility Data/PitchingFacilityData.csv")
 
 filtered_pitchingData <- pitchingData %>%
-  filter(Month == "January", Level %in% c("L1", "L2", "L3"), TaggedPitchType == "Fastball")
+  filter(Month == "March", Level %in% c("L1 (9u-11u)", "L2 (12u-14u)", "L3 (15u-18u)"), TaggedPitchType == "Fastball") %>%
+  mutate(Level = case_when(
+    Level == "L1 (9u-11u)" ~ "L1",
+    Level == "L2 (12u-14u)" ~ "L2",
+    Level == "L3 (15u-18u)" ~ "L3",
+    TRUE ~ Level # This keeps the original value if none of the above conditions are met
+  ))
 
 max_velo_per_athlete <- filtered_pitchingData %>%
   group_by(Name, Level) %>%
@@ -38,10 +50,10 @@ ranking_velo <- max_velo_per_athlete %>%
   select(Name, Level, Rank, MaxRelSpeed)
 
 
-speedData <- read_csv("/Volumes/COLE'S DATA/Data/Data Dump/SpeedFacilityData.csv")
+speedData <- read_csv("/Users/watts/Documents/Futures Performance Center/Data/Facility Data/SpeedFacilityData.csv")
 
 filtered_speedData <- speedData %>% 
-  filter(Month == "January", Level %in% c("L1", "L2", "L3"))
+  filter(Month == "March", Level %in% c("L1", "L2", "L3"))
 
 mph_per_athlete <- filtered_speedData %>%
   filter(`Exercise Name` == "Max Velocity") %>% 
@@ -87,11 +99,10 @@ ranking_RSI <- RSI_per_athlete %>%
   mutate(Rank = row_number()) %>%
   select(Name, Level, Rank, `Max RSI`)
 
-
-strengthData <- read_csv("/Volumes/COLE'S DATA/Data/Data Dump/StrengthFacilityData.csv")
+strengthData <- read_csv("/Users/watts/Documents/Futures Performance Center/Data/Facility Data/StrengthFacilityData.csv")
 
 filtered_strengthData <- strengthData %>% 
-  filter(Month == "January", Level %in% c("L1", "L2", "L3"))
+  filter(Month == "March", Level %in% c("L1", "L2", "L3"))
 
 ISOSQT_per_athlete <- filtered_strengthData %>%
   filter(`Exercise Type` == "ForceDeck: ISOSQT") %>% 
@@ -115,32 +126,27 @@ ranking_SQTJump <- SQTJump_per_athlete %>%
   mutate(Rank = row_number()) %>%
   select(Name, Level, Rank, `Max Takeoff Peak Force`)
 
-
-proteusData <- read_csv("/Users/watts/Downloads/SummaryProteus_data.csv")
-
-filtered_proteusData <- proteusData %>% 
-  filter(Level %in% c("L1", "L2", "L3"))
-
-power_per_athlete <- filtered_proteusData %>%
+proteus_power_per_athlete <- filtered_strengthData %>%
+  filter(`Exercise Name` == "Proteus Full Test") %>% 
   group_by(Name, Level) %>%
-  summarize(`Max Power` = max(Average_Power_Mean), .groups = 'drop')
+  summarize(Power = max(`power - high`), .groups = 'drop')
 
-ranking_proteus_power <- power_per_athlete %>%
+ranking_proteus_power <- proteus_power_per_athlete %>%
   group_by(Level) %>% 
-  arrange(Level, desc(`Max Power`)) %>%
+  arrange(Level, desc(Power)) %>%
   mutate(Rank = row_number()) %>%
-  select(Name, Level, Rank, `Max Power`)
+  select(Name, Level, Rank, Power)
 
-p_acceleration_per_athlete <- filtered_proteusData %>%
+proteus_acc_per_athlete <- filtered_strengthData %>%
+  filter(`Exercise Name` == "Proteus Full Test") %>% 
   group_by(Name, Level) %>%
-  summarize(`Max P_Acceleration` = max(Average_Acceleration_Mean), .groups = 'drop')
+  summarize(Acceleration = max(`acceleration - high`), .groups = 'drop')
 
-ranking_protues_acceleration <- p_acceleration_per_athlete %>%
+ranking_proteus_acceleration <- proteus_acc_per_athlete %>%
   group_by(Level) %>% 
-  arrange(Level, desc(`Max P_Acceleration`)) %>%
+  arrange(Level, desc(Acceleration)) %>%
   mutate(Rank = row_number()) %>%
-  select(Name, Level, Rank, `Max P_Acceleration`)
-
+  select(Name, Level, Rank, Acceleration)
 
 # Combine all ranking data frames into one
 combined_ranking_data <- bind_rows(
@@ -154,9 +160,9 @@ combined_ranking_data <- bind_rows(
   ranking_ISOSQT,
   ranking_SQTJump,
   ranking_proteus_power,
-  ranking_protues_acceleration
+  ranking_proteus_acceleration
 )
 
 # Write the combined data frame to a CSV file
-write_csv(combined_ranking_data, "/Volumes/COLE'S DATA/Data/Data Dump/CombinedRankingData.csv")
+write_csv(combined_ranking_data, "/Users/watts/Documents/Futures Performance Center/Data/Facility Data/PlayerRankings.csv")
 

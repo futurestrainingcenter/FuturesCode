@@ -1,8 +1,10 @@
 # Load necessary libraries
 library(dplyr)
+library(readxl)
+library(readr)
 
 # Set the working directory to the folder containing your CSV files
-setwd("/Users/watts/Downloads/Full Team Report - 2023-12-29 - 2023-12-29 - 1706645653") # replace with your folder path
+setwd("/Users/watts/Downloads/Full Team Report - 2024-03-29 - 2024-03-29 - 1714605044") # replace with your folder path
 
 # Get a list of all CSV files in the directory
 file_list <- list.files(pattern = "\\.csv$")

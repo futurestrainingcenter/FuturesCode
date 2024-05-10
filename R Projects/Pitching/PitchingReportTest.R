@@ -22,10 +22,18 @@ library(webshot2)
 font_add(family = "Good Times", regular = "good times rg.otf")
 showtext_auto()
 
-trackmanData <- read_csv("/Users/watts/Documents/Futures Performance Center/Data/Trackman Data/MasterTrackmanData.csv") %>% 
-  mutate(Pitcher = str_split(Pitcher, pattern = ", ", simplify = TRUE) %>% 
+trackmanData <- read_csv("/Users/watts/Documents/Futures Performance Center/Data/masterTrackmanData copy.csv")
+trackmanData$Date <- mdy(trackmanData$Date)
+
+trackmanData <- trackmanData %>% 
+  filter(Date == "2024-02-08")
+
+trackmanData <- trackmanData %>% 
+  mutate(ZoneCheck = case_when(between(PlateLocHeight, 1.65, 3.65) & between(PlateLocSide, -0.75, 0.75) ~ TRUE, TRUE ~ FALSE),
+         Month = month(Date, label = TRUE, abbr = FALSE),
+         Pitcher = str_split(Pitcher, pattern = ", ", simplify = TRUE) %>% 
            apply(1, function(x) paste(x[2], x[1]))) %>%
-  filter(!is.na(TaggedPitchType))
+  filter(!is.na(TaggedPitchType) & Month == "February" & PitchSession == "Live")
 
 armCareData <- read_csv("/Users/watts/Downloads/ArmCare_data.csv")
 armCareData$`Exam Date` <- mdy(armCareData$`Exam Date`)
@@ -36,16 +44,44 @@ armCareData <- armCareData %>%
     Month = month(`Exam Date`, label = TRUE, abbr = FALSE)) %>%
   filter(
     `Exam Type` %in% c("Fresh - Quick", "Fresh - Full"),
-    Month == "December")
+    Month == "February")
 
-clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv")
-attendanceData <- read_csv("/Users/watts/Downloads/PitchingAttendance_data.csv")
+clientData <- read_csv("/Users/watts/Downloads/FullClientList.csv") %>% 
+  rename(Name = Client)
+attendanceData <- read_csv("/Users/watts/Downloads/CheckIns.csv") %>%
+  rename(Name = Client) %>% 
+  mutate(Date = as.Date(Date, format = "%b %d, %Y"),
+         Month = month(Date, label = TRUE, abbr = FALSE)) %>%
+  filter(`Service Name` %in% c("Academy Pitching G1", "Academy Pitching G2", "Academy Pitching G3", "Baseball Pitching L1", "Baseball Pitching L2",
+                               "Baseball Pitching L3", "Pitching 1on1", "Professional - Facility Access"))
+
+summary_attendanceData <- attendanceData %>%
+  filter(Month == "February") %>% 
+  group_by(Name) %>%
+  summarise(Attendance = n(),
+            .groups = 'drop')
+
+# Extract names from clientData
+clientNames <- clientData$Name
+
+# # Compare and extract non-matching names
+# nonMatchingTrackman <- setdiff(trackmanData$Pitcher, clientNames)
+# nonMatchingArmCare <- setdiff(armCareData$Name, clientNames)
+#
+# # Combine non-matching names into one data frame
+# nonMatching <- rbind(
+#   data.frame(Name = nonMatchingTrackman, Source = 'Trackman'),
+#   data.frame(Name = nonMatchingArmCare, Source = 'ArmCare')
+# )
+
+# # Write the non-matching names to a new CSV file
+# write_csv(nonMatching, "/Users/watts/Downloads/missing_pitching_data.csv")
 
 calculate_age <- function(birthdate) {
   if (is.na(birthdate)) {
     return(NA)
   } else {
-    birthdate <- ymd(birthdate) # Convert to Date using lubridate
+    birthdate <- mdy(birthdate) # Convert to Date using lubridate
     age <- interval(start = birthdate, end = Sys.Date()) / years(1)
     return(floor(age)) # Floor the age to get complete years
   }
@@ -55,24 +91,28 @@ calculate_age <- function(birthdate) {
 clientData$Age <- sapply(clientData$`field-general-7.dl_date`, calculate_age)
 colnames(clientData)[colnames(clientData) == "Client"] <- "Name"
 
-pitchers <- unique(trackmanData$Pitcher)
-
-TemplatePageOne <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Pitching Report Test.pdf")
+TemplatePageOne <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Pitching Report Template.pdf")
 IndexPage <- image_read_pdf("/Volumes/COLE'S DATA/Templates/Pitching Report Metric Index.pdf")
 
-USABaseball <- c("ChangeUp"="#3d9be9", "Curveball"="#00FF00", "Cutter"="#FFFF00", "Fastball"="#FF0000", "Sinker"="#FFA500", "Slider"="#800080", "Splitter"="#FF69B4")
+USABaseball <- c("ChangeUp"="#3d9be9", "Curveball"="#00FF00", "Cutter"="#FFFF00", "Fastball"="#FF0000", "Sinker"="#FFA500", "Slider"="#AD0AFD", "Splitter"="#FF69B4")
 
 setwd("/Users/watts/Documents/Futures Performance Center/Test")
 
 col_grid <- rgb(235, 235, 235, 25, maxColorValue = 255)
 
-for (pitcher in pitchers){
-  
+pitcher <- "Casey Dykstra"
+
   filteredTrackmanData <- trackmanData %>% 
     filter(Pitcher == pitcher & (sum(!is.na(Flag)) > 0 | is.na(Flag)))
   
-  if (nrow(filteredTrackmanData) == 0) {
-    print(paste("No trackman data for:", pitcher))
+  attendance_plot_data <- summary_attendanceData %>%
+    filter(Name == pitcher) %>% 
+    mutate(`Total Weeks` = 4, # Adjust this number based on the exact number of weeks in the 2-month period
+           `Attendance Score` = round(Attendance / `Total Weeks`, digits = 1))
+  
+  attendance_score <- max(attendance_plot_data$`Attendance Score`, na.rm = TRUE)
+  
+  if (attendance_score == -Inf || is.na(attendance_score) || attendance_score <= 0.1) {
     next
   }
   
@@ -80,6 +120,42 @@ for (pitcher in pitchers){
   if (!dir.exists(pitcher_folder)) {
     dir.create(pitcher_folder, recursive = TRUE)
   }
+  
+  get_color <- function(scores) {
+    sapply(scores, function(score) {
+      if (is.na(score)) {
+        return(NA)
+      } else if (score < 0.5) {
+        return("#FF0000")
+      } else if (score >= 0.5 & score < 1) {
+        return("#FFA500")
+      } else if (score >= 1 & score < 1.5) {
+        return("green")
+      } else {
+        return("#3d9be9")
+      }
+    })
+  }
+  
+  # Plotting
+  attendance_plot <- ggplot(attendance_plot_data, aes(x = Name, y = `Attendance Score`)) +
+    geom_col(aes(fill = get_color(`Attendance Score`))) +
+    geom_col(aes(y = 2), alpha = 0.5, color = "black") +
+    geom_text(aes(y = 1, label = paste(attendance_score)), size = 12, fontface = "bold", color = "white") +
+    coord_flip() +
+    theme_minimal() +
+    theme(
+      axis.title = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      panel.background = element_blank()) +
+    scale_fill_identity()
+  
+  ggsave(attendance_plot,file=paste0("Futures Reports Images/",pitcher,"_attendancePlot.png"), width=2.65,height=0.65,units="in", dpi = 175)
+  attendancePlot <- image_read(paste0("Futures Reports Images/",pitcher,"_attendancePlot.png"))
+  PitchingReport1 <- image_composite(TemplatePageOne, attendancePlot, offset= "+1965+585")
   
   player_profile <- clientData %>%
     filter(Name == pitcher) %>%
@@ -134,7 +210,7 @@ for (pitcher in pitchers){
   
   ggsave(p,file=paste0("Futures Reports Images/",pitcher," - playerProfile.png"), width=16,height=2.25,units="in", dpi = 150)
   playerSummary1 <- image_read(paste0("Futures Reports Images/",pitcher," - playerProfile.png"))
-  PitchingReport1 <- image_composite(TemplatePageOne, playerSummary1, offset= "+50+475")
+  PitchingReport2 <- image_composite(PitchingReport1, playerSummary1, offset= "+50+475")
   
   armCarePlotData <- armCareData %>% 
     filter(Name == pitcher) %>%
@@ -151,9 +227,9 @@ for (pitcher in pitchers){
   
   armStrengthPlot <- armCarePlotData %>%
     ggplot(aes(x = `Exam Date`, y = `Arm Score`, color = "Arm Score")) +
+    geom_hline(yintercept = 70, linetype="dashed", color="green") +
     geom_line(linewidth = 2, color = "#3d9be9") +
     geom_point(size = 4, color = "#3d9be9") +
-    geom_hline(yintercept = 70, linetype="dashed", color="green") +
     labs(y = "% BW", x = NULL) +
     theme_minimal() +
     theme(legend.position = "none",
@@ -161,17 +237,17 @@ for (pitcher in pitchers){
           axis.text=element_text(color = "white", size = 15),
           axis.title = element_text(color = "white", size = 15))
   
-  ggsave(armStrengthPlot,file=paste0("Futures Reports Images/", pitcher," - armStrengthPlot.png"),width=7.25,height=2.85,units="in", dpi = 150)
+  ggsave(armStrengthPlot,file=paste0("Futures Reports Images/", pitcher," - armStrengthPlot.png"),width=5.5,height=3.25,units="in", dpi = 150)
   pitchCharts1<- image_read(paste0("Futures Reports Images/", pitcher," - armStrengthPlot.png"))
-  PitchingReport2 <- image_composite(PitchingReport1,pitchCharts1,offset= "+100+2805")
+  PitchingReport3 <- image_composite(PitchingReport2,pitchCharts1,offset= "+1035+2682")
   
   armCarePlot_one <- armCarePlotData %>%
     ggplot(aes(x = `Exam Date`)) +
+    geom_hline(yintercept = 20, linetype="dashed", color="green") +
     geom_line(aes(y = IR, color = "IR"), linewidth = 2) + 
     geom_line(aes(y = ER, color = "ER"), linewidth = 2) + 
     geom_point(aes(y = IR, color = "IR"), size = 4) + 
     geom_point(aes(y = ER, color = "ER"), size = 4) + 
-    geom_hline(yintercept = 20, linetype="dashed", color="green") +
     labs(y = "% BW", x = NULL) +
     scale_color_manual(values = c("IR" = "#FF0000", "ER" = "#3d9be9")) +
     theme_minimal() +
@@ -181,67 +257,67 @@ for (pitcher in pitchers){
           panel.grid = element_line(color = col_grid),
           axis.text=element_text(color = "white", size = 15),
           axis.title = element_text(color = "white", size = 15))
-
-
-  armCarePlot_two <- armCarePlotData %>%
-    ggplot(aes(x = `Exam Date`)) +
-    geom_line(aes(y = Scaption, color = "Scaption"), linewidth = 2) +
-    geom_line(aes(y = Grip, color = "Grip"), linewidth = 2) +
-    geom_point(aes(y = Scaption, color = "Scaption"), size = 4) +
-    geom_point(aes(y = Grip, color = "Grip"), size = 4) +
-    geom_hline(yintercept = 15, linetype="dashed", color="green") +
-    labs(y = "% BW", x = NULL) +
-    scale_color_manual(values = c("Scaption" = "#FF0000", "Grip" = "#3d9be9")) +
-    theme_minimal() +
-    theme(legend.position = "bottom",
-          legend.title= element_blank(),
-          legend.text = element_text(color = "white", size = 20),
-          panel.grid = element_line(color = col_grid),
-          axis.text=element_text(color = "white", size = 15),
-          axis.title = element_text(color = "white", size = 15))
-
-
-  ggsave(armCarePlot_one,file=paste0("Futures Reports Images/", pitcher," - armcarePlot1.png"),width=5.7,height=3,units="in", dpi = 150)
+  
+  
+  # armCarePlot_two <- armCarePlotData %>%
+  #   ggplot(aes(x = `Exam Date`)) +
+  #   geom_hline(yintercept = 15, linetype="dashed", color="green") +
+  #   geom_line(aes(y = Scaption, color = "Scaption"), linewidth = 2) +
+  #   geom_line(aes(y = Grip, color = "Grip"), linewidth = 2) +
+  #   geom_point(aes(y = Scaption, color = "Scaption"), size = 4) +
+  #   geom_point(aes(y = Grip, color = "Grip"), size = 4) +
+  #   labs(y = "% BW", x = NULL) +
+  #   scale_color_manual(values = c("Scaption" = "#FF0000", "Grip" = "#3d9be9")) +
+  #   theme_minimal() +
+  #   theme(legend.position = "bottom",
+  #         legend.title= element_blank(),
+  #         legend.text = element_text(color = "white", size = 20),
+  #         panel.grid = element_line(color = col_grid),
+  #         axis.text=element_text(color = "white", size = 15),
+  #         axis.title = element_text(color = "white", size = 15))
+  
+  
+  ggsave(armCarePlot_one,file=paste0("Futures Reports Images/", pitcher," - armcarePlot1.png"),width=5.5,height=3.75,units="in", dpi = 150)
   pitchCharts2<- image_read(paste0("Futures Reports Images/", pitcher," - armcarePlot1.png"))
-  PitchingReport3 <- image_composite(PitchingReport2,pitchCharts2,offset= "+100+2200")
-
-  ggsave(armCarePlot_two,file=paste0("Futures Reports Images/", pitcher," - armcarePlot2.png"),width=5.7,height=3,units="in", dpi = 150)
-  pitchCharts3<- image_read(paste0("Futures Reports Images/", pitcher," - armcarePlot2.png"))
-  PitchingReport4 <- image_composite(PitchingReport3,pitchCharts3,offset= "+1000+2200")
+  PitchingReport4 <- image_composite(PitchingReport3,pitchCharts2,offset= "+105+2690")
   
-  SVRplotData <- armCareData %>%
-    filter(Name == pitcher) %>%
-    select(`Exam Date`, "SVR") %>% 
-    arrange(`Exam Date`) %>% 
-    na.omit()
+  # ggsave(armCarePlot_two,file=paste0("Futures Reports Images/", pitcher," - armcarePlot2.png"),width=5.7,height=3,units="in", dpi = 150)
+  # pitchCharts3<- image_read(paste0("Futures Reports Images/", pitcher," - armcarePlot2.png"))
+  # PitchingReport5 <- image_composite(PitchingReport4,pitchCharts3,offset= "+1000+2200")
   
-  SVRplot <- SVRplotData %>%
-    ggplot(aes(x = `Exam Date`, y = SVR, color = "")) +
-    geom_line(linewidth = 2, color = "#3d9be9") +
-    geom_point(size = 4, color = "#3d9be9") +
-    geom_hline(yintercept = 1.60, linetype="dashed", color="green") +
-    geom_hline(yintercept = 1.40, linetype="dashed", color="red") +
-    labs(y = "SVR", x = NULL) + # Add label for the color legend
-    theme_minimal() +
-    theme(legend.position = "none",
-          panel.grid = element_line(color = col_grid),
-          axis.text=element_text(color = "white", size = 15),
-          axis.title = element_text(color = "white", size = 15))
-  
-  ggsave(SVRplot,file=paste0("Futures Reports Images/", pitcher," - SVRplot.png"),width=7.25,height=2.85,units="in", dpi = 150)
-  pitchCharts4<- image_read(paste0("Futures Reports Images/", pitcher," - SVRplot.png"))
-  PitchingReport5 <- image_composite(PitchingReport4,pitchCharts4,offset= "+1315+2805")
+  # SVRplotData <- armCareData %>%
+  #   filter(Name == pitcher) %>%
+  #   select(`Exam Date`, "SVR") %>% 
+  #   arrange(`Exam Date`) %>% 
+  #   na.omit()
+  # 
+  # SVRplot <- SVRplotData %>%
+  #   ggplot(aes(x = `Exam Date`, y = SVR, color = "")) +
+  #   geom_hline(yintercept = 1.60, linetype="dashed", color="green") +
+  #   geom_hline(yintercept = 1.40, linetype="dashed", color="red") +
+  #   geom_line(linewidth = 2, color = "#3d9be9") +
+  #   geom_point(size = 4, color = "#3d9be9") +
+  #   labs(y = "SVR", x = NULL) + # Add label for the color legend
+  #   theme_minimal() +
+  #   theme(legend.position = "none",
+  #         panel.grid = element_line(color = col_grid),
+  #         axis.text=element_text(color = "white", size = 15),
+  #         axis.title = element_text(color = "white", size = 15))
+  # 
+  # ggsave(SVRplot,file=paste0("Futures Reports Images/", pitcher," - SVRplot.png"),width=7.25,height=2.85,units="in", dpi = 150)
+  # pitchCharts4<- image_read(paste0("Futures Reports Images/", pitcher," - SVRplot.png"))
+  # PitchingReport6 <- image_composite(PitchingReport5,pitchCharts4,offset= "+1315+2805")
   
   shoulderBalance_plot <- ggplot() +
     geom_text(aes(x = 0.5, y = 0.5, label = paste(round(shoulderBalanceAVG, digits = 2))),
               size = 25, color = "white", family = "Good Times") +
     theme_void() +
     theme(plot.margin = margin(1, 1, 1, 1, "cm"))
-
+  
   ggsave(shoulderBalance_plot,file=paste0("Futures Reports Images/", pitcher," - shoulderBalance.png"),width=5,height=5.15,units="in", dpi = 150)
-  pitchCharts5<- image_read(paste0("Futures Reports Images/", pitcher," - shoulderBalance.png"))
-  PitchingReport6 <- image_composite(PitchingReport5,pitchCharts5,offset= "+1825+1975")
-    
+  pitchCharts3<- image_read(paste0("Futures Reports Images/", pitcher," - shoulderBalance.png"))
+  PitchingReport5 <- image_composite(PitchingReport4,pitchCharts3,offset= "+1825+2500")
+  
   total_filteredTrackmanData <- nrow(filteredTrackmanData)
   
   pitchStats <- filteredTrackmanData %>%
@@ -254,13 +330,14 @@ for (pitcher in pitchers){
               AvgHB = format(round(mean(HorzBreak, na.rm = TRUE), 1)),
               AvgSpinRate = format(round(mean(SpinRate, na.rm = TRUE), 0)),
               AvgGyro = format(round(mean(SpinAxis3dLongitudinalAngle, na.rm = TRUE), 1)),
-              #Zone = format(round(mean(ZoneCheck, na.rm = TRUE) * 100, 1)),
+              Zone = format(round(mean(ZoneCheck, na.rm = TRUE) * 100, 1)),
               Height = format(round(mean(RelHeight, na.rm = TRUE), 1)),
               Side = format(round(mean(RelSide, na.rm = TRUE), 1)),
               Extension = format(round(mean(Extension, na.rm = TRUE), 1))) %>%
     arrange(desc(AvgVelo)) %>% 
     select(-`#`)
-  colnames(pitchStats) <- c('Pitch Type', "%", 'Avg Velo', 'Max Velo', 'Vert', 'Horz', 'Avg Spin', 'Avg Gyro', "Height", "Side", "Extension") 
+  colnames(pitchStats) <- c('Pitch Type', "%", 'Avg Velo (mph)', 'Max Velo (mph)', 'Vert (in)', 'Horz (in)', 'Avg Spin (rpm)', 
+                            'Avg Gyro (deg)', "K%", "Height (in)", "Side (in)", "Ext. (in)") 
   
   gt_table <- pitchStats %>% 
     gt(rowname_col = "Pitch Type") %>% 
@@ -275,11 +352,11 @@ for (pitcher in pitchers){
     ) %>%
     tab_spanner(
       label = "Metrics",
-      columns = c('Avg Velo', 'Max Velo', 'Vert', 'Horz', 'Avg Spin', 'Avg Gyro')
+      columns = c('Avg Velo (mph)', 'Max Velo (mph)', 'Vert (in)', 'Horz (in)', 'Avg Spin (rpm)', 'Avg Gyro (deg)', 'K%')
     ) %>% 
     tab_spanner(
       label = "Release",
-      columns = c("Height", "Side", "Extension")
+      columns = c("Height (in)", "Side (in)", "Ext. (in)")
     ) %>% 
     tab_style(
       style = cell_text(size = px(18), color = "#3d9be9"),
@@ -301,13 +378,8 @@ for (pitcher in pitchers){
     cols_width(
       `Pitch Type` ~ px(125),
       `%` ~ px(50),
-      Height ~ px(75),
-      Side ~ px(75),
-      Extension ~ px(75),
-      everything() ~ px(90)
-    ) %>% 
-    cols_label(
-      Extension = "Ext."
+      `K%` ~ px(50),
+      everything() ~ px(105)
     )
   
   apply_tab_style_if_exists <- function(gt_table, pitch_type, color) {
@@ -337,7 +409,7 @@ for (pitcher in pitchers){
     "Cutter" = "#FFFF00",
     "Fastball" = "#FF0000",
     "Sinker" = "#FFA500",
-    "Slider" = "#800080",
+    "Slider" = "#AD0AFD",
     "Splitter" = "#FF69B4"
   )
   
@@ -345,30 +417,37 @@ for (pitcher in pitchers){
     gt_table <- apply_tab_style_if_exists(gt_table, pitch_type, pitch_types_colors[[pitch_type]])
   }
   
-  gtsave(gt_table, file = paste0("Futures Reports Images/ ",pitcher, "- pitchingSummary.png"), expand = 5)
+  gtsave(gt_table, file = paste0("Futures Reports Images/ ",pitcher, "- pitchingSummary.png"), vwidth = 1200, expand = 5)
   
   pitchSummaries1 <- image_read(paste0("Futures Reports Images/ ",pitcher,"- pitchingSummary.png"))
   pitchSummaries1 <- pitchSummaries1 %>% 
     image_transparent(color = "black") %>% 
     image_trim()
-  PitchingReport7 <- image_composite(PitchingReport6,pitchSummaries1,offset= "+330+800")
+  PitchingReport6 <- image_composite(PitchingReport5,pitchSummaries1,offset= "+102+850")
+  
+  meanMovement <- filteredTrackmanData %>% 
+    group_by(TaggedPitchType) %>% 
+    summarise(`Avg HorzBreak` = mean(HorzBreak, na.rm = TRUE),
+              `Avg VertBreak` = mean(InducedVertBreak, na.rm = TRUE))
   
   movement_plot <- filteredTrackmanData %>% 
     ggplot(aes(x = HorzBreak, y = InducedVertBreak, fill = TaggedPitchType)) +
-    geom_jitter(shape = 21, size = 4, alpha = 0.75) +
+    geom_jitter(shape = 21, size = 2, alpha = 0.75, stroke = 0) +
+    geom_point(data = meanMovement, aes(x = `Avg HorzBreak`, y = `Avg VertBreak`, fill = TaggedPitchType), shape = 21, size = 7, color = "black") +
     geom_hline(yintercept = 0, color = "white") +
     geom_vline(xintercept = 0, color = "white") +
     xlim(-25,25) +
     ylim(-25,25) +
     labs(x = "Horizontal Break", y = "Induced Vertical Break") +
     scale_fill_manual(values = USABaseball,
-                       labels = c("CH", "CB", "CU", "FB", "SI", "SL", "FS"),
-                       breaks = names(USABaseball)) +
+                      labels = c("CH", "CB", "CU", "FB", "SI", "SL", "FS"),
+                      breaks = names(USABaseball)) +
     theme_minimal() +
     theme(legend.position = "none",
           panel.grid = element_line(color = col_grid),
           axis.text=element_text(color = "white", size = 15),
           axis.title = element_text(color = "white", size = 15))
+  
   
   strikezone_plot <- filteredTrackmanData %>% 
     ggplot(aes(x = PlateLocSide * 12, y = PlateLocHeight * 12, fill = TaggedPitchType)) +
@@ -408,12 +487,12 @@ for (pitcher in pitchers){
   #         plot.title = element_text(hjust = 0.5, color = "white", size = 38, family = "Good Times"))
   
   ggsave(movement_plot,file=paste0("Futures Reports Images/", pitcher," - movementPlot.png"), width=4,height=3.70,units="in", dpi = 150)
-  pitchCharts6 <- image_read(paste0("Futures Reports Images/", pitcher ," - movementPlot.png"))
-  PitchingReport8 <- image_composite(PitchingReport7,pitchCharts6, offset= "+1815+1485")
+  pitchCharts4 <- image_read(paste0("Futures Reports Images/", pitcher ," - movementPlot.png"))
+  PitchingReport7 <- image_composite(PitchingReport6,pitchCharts4, offset= "+1815+1975")
   
   ggsave(strikezone_plot,file=paste0("Futures Reports Images/", pitcher," - strikezonePlot.png"), width=4,height=3.70,units="in", dpi = 150)
-  pitchCharts7 <- image_read(paste0("Futures Reports Images/", pitcher ," - strikezonePlot.png"))
-  PitchingReport9 <- image_composite(PitchingReport8,pitchCharts7, offset= "+100+1485")
+  pitchCharts5 <- image_read(paste0("Futures Reports Images/", pitcher ," - strikezonePlot.png"))
+  PitchingReport8 <- image_composite(PitchingReport7,pitchCharts5, offset= "+125+1975")
   
   # ggsave(release_plot,file=paste0("Futures Reports Images/", pitcher," - releasePlot.png"), width=4.5,height=4,units="in", dpi = 150)
   # pitchCharts6 <- image_read(paste0("Futures Reports Images/", pitcher ," - releasePlot.png"))
@@ -421,7 +500,6 @@ for (pitcher in pitchers){
   
   max_speed_data <- filteredTrackmanData %>%
     filter(Pitcher == pitcher) %>% 
-    mutate(Date = mdy(Date)) %>%
     group_by(Date, TaggedPitchType) %>%
     summarise(RelSpeed = max(RelSpeed, na.rm = TRUE), .groups = "drop")
   
@@ -433,8 +511,8 @@ for (pitcher in pitchers){
     geom_point(data = subset(max_speed_data, TaggedPitchType != "Fastball"), size = 4) +    
     labs(y = "Velocity", x = NULL) +
     scale_color_manual(values = USABaseball,
-                      labels = c("CH", "CB", "CU", "FB", "SI", "SL", "FS"),
-                      breaks = names(USABaseball)) +    
+                       labels = c("CH", "CB", "CU", "FB", "SI", "SL", "FS"),
+                       breaks = names(USABaseball)) +    
     theme_minimal() +
     theme(legend.position = "none",
           panel.grid = element_line(color = col_grid),
@@ -443,70 +521,11 @@ for (pitcher in pitchers){
   
   
   ggsave(velocity_plot,file=paste0("Futures Reports Images/", pitcher," - velocityPlot.png"),width=6,height=3.4,units="in", dpi = 150)
-  pitchCharts8<- image_read(paste0("Futures Reports Images/", pitcher," - velocityPlot.png"))
-  PitchingReport10 <- image_composite(PitchingReport9,pitchCharts8,offset= "+800+1530")
+  pitchCharts6<- image_read(paste0("Futures Reports Images/", pitcher," - velocityPlot.png"))
+  PitchingReport9 <- image_composite(PitchingReport8,pitchCharts6,offset= "+815+2000")
   
-  attendance_plot_data <- attendanceData %>%
-    filter(`Client name` == pitcher) %>% 
-    mutate(`Attendance Score` = round(pmin((Attended / 4) * 100, 100), digits = 2))
-  
-  attendance_score <- max(attendance_plot_data$`Attendance Score`, na.rm = TRUE)
-  
-  get_color <- function(score) {
-    if (score < 33) {
-      return("#FF0000")
-    } else if (score >= 33 & score < 66) {
-      return("#FFA500")
-    } else if (score >= 66 & score < 90) {
-      return("green")
-    } else {
-      return("#3d9be9")
-    }
-  }
-  
-  # Check if all attendance scores are NA
-  if (all(is.na(attendance_plot_data$`Attendance Score`))) {
-    # Handle the scenario where all scores are missing
-    attendance_plot <- ggplot(data.frame(ClientName = "N/A", y = 50), aes(x = ClientName, y = y)) +
-      geom_col(aes(y = 100), alpha = 0.5, color = "black") +
-      geom_text(aes(y = 50, label = "NA"), size = 12, color = "white") +
-      coord_flip() +
-      theme_minimal() +
-      theme(
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank()) +
-      scale_fill_identity()
-  } else {
-    # Existing code for when there are valid attendance scores
-    attendance_plot <- attendance_plot_data %>% 
-      ggplot(aes(x = `Client name`, y = `Attendance Score`)) +
-      geom_col(aes(fill = get_color(`Attendance Score`))) +
-      geom_col(aes(y = 100), alpha = 0.5, color = "black") +
-      geom_text(aes(y = 50, label = paste(attendance_score, "%")), size = 14, fontface = "bold", color = "white") +
-      coord_flip() +
-      theme_minimal() +
-      theme(
-        axis.title = element_blank(),
-        axis.text = element_blank(),
-        axis.ticks = element_blank(),
-        panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.background = element_blank()) +
-      scale_fill_identity()
-  }
-  
-  ggsave(attendance_plot,file=paste0("Futures Reports Images/",pitcher,"_attendancePlot.png"), width=2.90,height=0.75,units="in", dpi = 175)
-  attendancePlot <- image_read(paste0("Futures Reports Images/",pitcher,"_attendancePlot.png"))
-  PitchingReport11 <- image_composite(PitchingReport10, attendancePlot, offset= "+1965+575")
-  
-  image_write(PitchingReport11,path = "page1.pdf",format="pdf",quality=100,density=300)
+  image_write(PitchingReport9,path = "page1.pdf",format="pdf",quality=100,density=300)
   image_write(IndexPage,path = "page2.pdf",format="pdf",quality=100,density=300)
-  
   
   qpdf::pdf_combine(input = c("page1.pdf", "page2.pdf"),
                     output = paste0(pitcher_folder, "/", "Futures Pitching Report.pdf"))   
-}
