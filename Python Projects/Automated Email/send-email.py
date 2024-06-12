@@ -11,15 +11,14 @@ smtp_server = 'smtp.gmail.com'
 port = 465  # For SSL
 
 # Email Content
-subject = 'Your Futures Monthly Report - Important Update'
+subject = 'Your Futures Monthly Reports'
 body = """
     <html>
 <body>
     <p>Dear Futures Member,</p>
-    <p>We are pleased to share with you your personalized training reports for the month of April. These reports provide detailed insights into your performance and progress. You will find them attached to this email.</p>
-    <p>We wish to inform you that there is a delay in the delivery of the Hitting Reports due to a data processing issue with our HitTrax systems. Our team is actively working with HitTrax to resolve this as quickly as possible, and we will send your Hitting Report separately as soon as the data has been accurately compiled.</p>
-    <p>Should you have any questions about your reports please do not hesitate to to respond directly to this email. Our Data and Analytics Coordinator is ready to provide any assistance you may require.</p>
-    <p>Thank you for your understanding and patience. Your dedication and hard work are greatly appreciated, and we are committed to supporting your ongoing development and achievements.</p>
+    <p>We are pleased to share with you your personalized training reports for the month of May. These reports provide detailed insights into your performance and progress. You will find them attached to this email.</p>
+    <p>Should you have any questions about your report please do not hesitate to respond directly to this email. Our Data and Analytics Coordinator is ready to provide any assistance you may require.</p>
+    <p>Thank you for your dedication and hard work. We look forward to supporting your ongoing development and achievements.</p>
 </body>
 </html>
 """
