@@ -227,48 +227,48 @@ final_hitting_data <- final_hitting_data %>%
   mutate(
     AttackAngle_Check = as.integer(
       (Sport == "Baseball" & Level %in% c("Professional", "Collegiate") & `Attack Angle (deg)` >= 6 & `Attack Angle (deg)` <= 10) |
-        (Sport == "Baseball" & Level == "L1 (9u-11u)" & `Attack Angle (deg)` >= 5 & `Attack Angle (deg)` <= 15) |
-        (Sport == "Baseball" & Level == "L2 (12u-14u)" & `Attack Angle (deg)` >= 8 & `Attack Angle (deg)` <= 12) |
-        (Sport == "Baseball" & Level == "L3 (15u-18u)" & `Attack Angle (deg)` >= 8 & `Attack Angle (deg)` <= 12) |
+        (Sport == "Baseball" & Level == "L1" & `Attack Angle (deg)` >= 5 & `Attack Angle (deg)` <= 15) |
+        (Sport == "Baseball" & Level == "L2" & `Attack Angle (deg)` >= 8 & `Attack Angle (deg)` <= 12) |
+        (Sport == "Baseball" & Level == "L3" & `Attack Angle (deg)` >= 8 & `Attack Angle (deg)` <= 12) |
         (Sport == "Softball" & Level == "Collegiate" & `Attack Angle (deg)` >= 6 & `Attack Angle (deg)` <= 10) |
-        (Sport == "Softball" & Level == "L1 (9u-11u)" & `Attack Angle (deg)` >= 6 & `Attack Angle (deg)` <= 14) |
-        (Sport == "Softball" & Level == "L2 (12u-14u)" & `Attack Angle (deg)` >= 6 & `Attack Angle (deg)` <= 10) |
-        (Sport == "Softball" & Level == "L3 (15u-18u)" & `Attack Angle (deg)` >= 6 & `Attack Angle (deg)` <= 10)
+        (Sport == "Softball" & Level == "L1" & `Attack Angle (deg)` >= 6 & `Attack Angle (deg)` <= 14) |
+        (Sport == "Softball" & Level == "L2" & `Attack Angle (deg)` >= 6 & `Attack Angle (deg)` <= 10) |
+        (Sport == "Softball" & Level == "L3" & `Attack Angle (deg)` >= 6 & `Attack Angle (deg)` <= 10)
     ),
     VerticalBatAngle_Check = as.integer(
       (Sport == "Baseball" & Level %in% c("Professional", "Collegiate") & `Vertical Bat Angle (deg)` >= -27 & `Vertical Bat Angle (deg)` <= -37) |
-        (Sport == "Baseball" & Level == "L1 (9u-11u)" & `Vertical Bat Angle (deg)` >= -25 & `Vertical Bat Angle (deg)` <= -15) |
-        (Sport == "Baseball" & Level == "L2 (12u-14u)" & `Vertical Bat Angle (deg)` >= -30 & `Vertical Bat Angle (deg)` <= -20) |
-        (Sport == "Baseball" & Level == "L3 (15u-18u)" & `Vertical Bat Angle (deg)` >= -37 & `Vertical Bat Angle (deg)` <= -27) |
+        (Sport == "Baseball" & Level == "L1" & `Vertical Bat Angle (deg)` >= -25 & `Vertical Bat Angle (deg)` <= -15) |
+        (Sport == "Baseball" & Level == "L2" & `Vertical Bat Angle (deg)` >= -30 & `Vertical Bat Angle (deg)` <= -20) |
+        (Sport == "Baseball" & Level == "L3" & `Vertical Bat Angle (deg)` >= -37 & `Vertical Bat Angle (deg)` <= -27) |
         (Sport == "Softball" & Level == "Collegiate" & `Vertical Bat Angle (deg)` >= -27 & `Vertical Bat Angle (deg)` <= -37) |
-        (Sport == "Softball" & Level == "L1 (9u-11u)" & `Vertical Bat Angle (deg)` >= -25 & `Vertical Bat Angle (deg)` <= -15) |
-        (Sport == "Softball" & Level == "L2 (12u-14u)" & `Vertical Bat Angle (deg)` >= -30 & `Vertical Bat Angle (deg)` <= -20) |
-        (Sport == "Softball" & Level == "L3 (15u-18u)" & `Vertical Bat Angle (deg)` >= -37 & `Vertical Bat Angle (deg)` <= -27)
+        (Sport == "Softball" & Level == "L1" & `Vertical Bat Angle (deg)` >= -25 & `Vertical Bat Angle (deg)` <= -15) |
+        (Sport == "Softball" & Level == "L2" & `Vertical Bat Angle (deg)` >= -30 & `Vertical Bat Angle (deg)` <= -20) |
+        (Sport == "Softball" & Level == "L3" & `Vertical Bat Angle (deg)` >= -37 & `Vertical Bat Angle (deg)` <= -27)
     ),
     ConnectionAtImpact_Check = as.integer(
       (Sport == "Baseball" & Level %in% c("Professional", "Collegiate") & `Connection at Impact (deg)` >= 90 & `Connection at Impact (deg)` <= 95) |
-        (Sport == "Baseball" & Level == "L1 (9u-11u)" & `Connection at Impact (deg)` >= 80 & `Connection at Impact (deg)` <= 100) |
-        (Sport == "Baseball" & Level == "L2 (12u-14u)" & `Connection at Impact (deg)` >= 85 & `Connection at Impact (deg)` <= 95) |
-        (Sport == "Baseball" & Level == "L3 (15u-18u)" & `Connection at Impact (deg)` >= 90 & `Connection at Impact (deg)` <= 95) |
+        (Sport == "Baseball" & Level == "L1" & `Connection at Impact (deg)` >= 80 & `Connection at Impact (deg)` <= 100) |
+        (Sport == "Baseball" & Level == "L2" & `Connection at Impact (deg)` >= 85 & `Connection at Impact (deg)` <= 95) |
+        (Sport == "Baseball" & Level == "L3" & `Connection at Impact (deg)` >= 90 & `Connection at Impact (deg)` <= 95) |
         (Sport == "Softball" & Level == "Collegiate" & `Connection at Impact (deg)` >= 90 & `Connection at Impact (deg)` <= 95) |
-        (Sport == "Softball" & Level == "L1 (9u-11u)" & `Connection at Impact (deg)` >= 80 & `Connection at Impact (deg)` <= 100) |
-        (Sport == "Softball" & Level == "L2 (12u-14u)" & `Connection at Impact (deg)` >= 85 & `Connection at Impact (deg)` <= 95) |
-        (Sport == "Softball" & Level == "L3 (15u-18u)" & `Connection at Impact (deg)` >= 90 & `Connection at Impact (deg)` <= 95)
+        (Sport == "Softball" & Level == "L1" & `Connection at Impact (deg)` >= 80 & `Connection at Impact (deg)` <= 100) |
+        (Sport == "Softball" & Level == "L2" & `Connection at Impact (deg)` >= 85 & `Connection at Impact (deg)` <= 95) |
+        (Sport == "Softball" & Level == "L3" & `Connection at Impact (deg)` >= 90 & `Connection at Impact (deg)` <= 95)
     ),
     EarlyConnection_Check = as.integer(
       (Sport == "Baseball" & Level %in% c("Professional", "Collegiate") & `Early Connection (deg)` >= 85 & `Early Connection (deg)` <= 105) |
-        (Sport == "Baseball" & Level == "L1 (9u-11u)" & `Early Connection (deg)` >= 80 & `Early Connection (deg)` <= 110) |
-        (Sport == "Baseball" & Level == "L2 (12u-14u)" & `Early Connection (deg)` >= 85 & `Early Connection (deg)` <= 110) |
-        (Sport == "Baseball" & Level == "L3 (15u-18u)" & `Early Connection (deg)` >= 85 & `Early Connection (deg)` <= 105) |
+        (Sport == "Baseball" & Level == "L1" & `Early Connection (deg)` >= 80 & `Early Connection (deg)` <= 110) |
+        (Sport == "Baseball" & Level == "L2" & `Early Connection (deg)` >= 85 & `Early Connection (deg)` <= 110) |
+        (Sport == "Baseball" & Level == "L3" & `Early Connection (deg)` >= 85 & `Early Connection (deg)` <= 105) |
         (Sport == "Softball" & Level == "Collegiate" & `Early Connection (deg)` >= 85 & `Early Connection (deg)` <= 105) |
-        (Sport == "Softball" & Level == "L1 (9u-11u)" & `Early Connection (deg)` >= 80 & `Early Connection (deg)` <= 110) |
-        (Sport == "Softball" & Level == "L2 (12u-14u)" & `Early Connection (deg)` >= 85 & `Early Connection (deg)` <= 110) |
-        (Sport == "Softball" & Level == "L3 (15u-18u)" & `Early Connection (deg)` >= 85 & `Early Connection (deg)` <= 105)
+        (Sport == "Softball" & Level == "L1" & `Early Connection (deg)` >= 80 & `Early Connection (deg)` <= 110) |
+        (Sport == "Softball" & Level == "L2" & `Early Connection (deg)` >= 85 & `Early Connection (deg)` <= 110) |
+        (Sport == "Softball" & Level == "L3" & `Early Connection (deg)` >= 85 & `Early Connection (deg)` <= 105)
     )
   )
 
 athlete_data <- final_hitting_data %>%
-  filter(!is.na(Gender), !is.na(Level)) %>% 
+  filter(!is.na(Gender), !is.na(Level), Level != "N/A") %>% 
   select(Name, Month, Year, FakeDate, Sport, Membership, `Membership Length`, Attendance, Level,
     MaxVel, MaxVel_Monthly_Change, MaxVel_Monthly_Percent_Change, MaxVel_YTD_Change, MaxVel_YTD_Percent_Change, `MaxVel Rank`,
     AvgVel, AvgVel_Monthly_Change, AvgVel_Monthly_Percent_Change, AvgVel_YTD_Change, AvgVel_YTD_Percent_Change, `AvgVel Rank`,
@@ -286,6 +286,7 @@ athlete_data <- final_hitting_data %>%
 
 
 write_csv(athlete_data, "/Users/watts/Documents/Futures Performance Center/Data/Facility Data/HittingFacilityData.csv", na = '')
+write_csv(athlete_data, "/Users/watts/Documents/Futures Performance Center/FuturesApps/Leaderboards/HittingFacilityData.csv", na = '')
 
 
 # Pitching ----------------------------------------------------------------
@@ -518,7 +519,7 @@ final_summary_pitching_data <- left_join(summary_pitching_data, clientData, by =
 final_pitching_data <- left_join(final_summary_pitching_data, summary_attendanceData, by = c("Name", "Month"))
 
 final_pitching_data <- final_pitching_data %>%
-  filter(!is.na(Level)) %>% 
+  filter(!is.na(Level), Level != "N/A") %>% 
   mutate(Year = year(Date)) %>% 
   select(Name, Date, Month, Year, Membership, `Membership Length`, Attendance, Level, TaggedPitchType, RelSpeed, RelHeight, RelSide, Extension, 
          InducedVertBreak, HorzBreak, PlateLocHeight, PlateLocSide, MonthlyChange_RelHeight, YTD_RelHeight, MonthlyChange_RelSide, 
@@ -533,6 +534,7 @@ final_pitching_data <- final_pitching_data %>%
          MonthlyChange_ShoulderBalance_Percent)
 
 write_csv(final_pitching_data, "/Users/watts/Documents/Futures Performance Center/Data/Facility Data/PitchingFacilityData.csv", na = '')
+write_csv(final_pitching_data, "/Users/watts/Documents/Futures Performance Center/FuturesApps/Leaderboards/PitchingFacilityData.csv", na = '')
 
 
 # Strength ----------------------------------------------------------------

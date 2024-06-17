@@ -99,7 +99,51 @@ strength_averages <- filtered_strength_data %>%
 # Merge datasets by Name (assuming 'Name' is a common identifier and present in both datasets)
 hitting_strength_merge <- merge(strength_averages, hitting_data, by = c("Name", "Month", "Year"))
 
+hitting_swing_summary <- hitting_strength_merge %>%
+  select(Name, Month, Year, `Exercise Name`, Selected_Metric, MaxVel, MaxDist, `Bat Speed (mph)`) %>%
+  group_by(Name) %>%
+  summarise(
+    AvgMaxVel = round(mean(MaxVel, na.rm = TRUE), 1),
+    AvgMaxDist = round(mean(MaxDist, na.rm = TRUE), 1),
+    AvgBatSpeed = round(mean(`Bat Speed (mph)`, na.rm = TRUE), 1),
+  )
+
+# Hitting Correlations CSV ------------------------------------------------
+
+
+hitting_strength_summary <- hitting_strength_merge %>%
+  select(Name, Month, Year, `Exercise Name`, Selected_Metric) %>%
+  group_by(Name, `Exercise Name`) %>%
+  summarise(
+    Value = round(mean(Selected_Metric, na.rm = TRUE), 2)
+  )
+
+hitting_final <- merge(hitting_strength_summary, hitting_swing_summary, by = ("Name"))
+
+write_csv(hitting_final, "/Users/watts/Downloads/hitting_strength_correlations.csv", na = '')
+
 pitching_strength_merge <- merge(strength_averages, summary_pitch_data, by = c("Name", "Month", "Year"))
+
+pitching_summary <- pitching_strength_merge %>%
+  select(Name, Month, Year, `Exercise Name`, Selected_Metric, meanRelSpeed) %>%
+  group_by(Name) %>%
+  summarise(
+    Velocity = round(mean(meanRelSpeed, na.rm = TRUE), 1)
+  )
+
+# Pitching Correlations CSV -----------------------------------------------
+
+
+pitching_strength_summary <- pitching_strength_merge %>%
+  select(Name, Month, Year, `Exercise Name`, Selected_Metric) %>%
+  group_by(Name, `Exercise Name`) %>%
+  summarise(
+    Value = round(mean(Selected_Metric, na.rm = TRUE), 2)
+  )
+
+pitching_final <- merge(pitching_strength_summary, pitching_summary, by = ("Name"))
+
+write_csv(pitching_final, "/Users/watts/Downloads/pitching_strength_correlations.csv", na = '')
 
 speed_strength_merge <- merge(strength_averages, merged_speed_final, by = c("Name", "Month", "Year"))
 
